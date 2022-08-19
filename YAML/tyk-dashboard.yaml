@@ -1,0 +1,181 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tyk-dashboard-conf
+  labels:
+    app: tyk-dashboard
+data:
+  tyk_analytics.conf: |-
+    {
+
+      "listen_port": 3000,
+      "tyk_api_config": {
+        "Host": "http://tyk-gateway",
+        "Port": "8080",
+        "Secret": "12345"
+      },
+      "mongo_url": "mongodb://mongo-db/tyk_analytics",
+      "page_size": 10,
+      "admin_secret": "352d20ee67be67f6340b4c0605b044b7",
+      "shared_node_secret": "352d20ee67be67f6340b4c0605b044b7",
+      "redis_port": 6379,
+      "redis_host": "redis-db",
+      "redis_password": "",
+      "enable_cluster": false,
+      "force_api_defaults": false,
+      "enable_ownership": true,
+      "notify_on_change": true,
+      "redis_database": 0,
+      "redis_hosts": null,
+      "hash_keys": true,
+      "enable_delete_key_by_hash": true,
+      "enable_update_key_by_hash": true,
+      "enable_duplicate_slugs": true,
+      "enable_multi_org_users": true,
+      "show_org_id": true,
+      "host_config": {
+        "generate_secure_paths": false,
+        "hostname": "tyk-dashboard",
+        "enable_host_names": true,
+        "override_hostname": "tyk-gateway:8080",
+        "disable_org_slug_prefix": true,
+        "portal_root_path": "/portal",
+        "use_strict_hostmatch": false
+      },
+      "http_server_options": {
+        "use_ssl": false,
+        "ssl_insecure_skip_verify": true,
+        "certificates": [
+        ],
+        "min_version": 0
+      },
+      "ui": {
+        "languages": {
+          "Chinese": "cn",
+          "English": "en",
+          "Korean": "ko"
+        },
+        "hide_help": false,
+        "default_lang": "en",
+        "login_page": {},
+        "nav": {
+          "dont_show_admin_sockets": false,
+          "hide_activity_by_api_section": false,
+          "hide_geo": false,
+          "hide_licenses_section": false,
+          "hide_logs": false,
+          "hide_tib_section": false
+        },
+        "uptime": {},
+        "portal_section": null,
+        "designer": {},
+        "dont_show_admin_sockets": false,
+        "dont_allow_license_management": false,
+        "dont_allow_license_management_view": false
+      },
+      "home_dir": "/opt/tyk-dashboard",
+      "tagging_options": {
+        "tag_all_apis_by_org": false
+      },
+      "use_sharded_analytics": false,
+      "enable_aggregate_lookups": true,
+      "enable_analytics_cache": false,
+      "aggregate_lookup_cutoff": "26/05/2016",
+      "maintenance_mode": false,
+      "allow_explicit_policy_id": true,
+      "node_schema_path": "",
+      "oauth_redirect_uri_separator": ";",
+      "audit": {
+        "enabled": true,
+        "format": "text",
+        "path": "/var/log/tyk-dashboard_audit.log",
+        "detailed_recording": true
+      },
+      "security": {
+        "audit_log_path": "/var/log/tyk-dashboard_audit.log"
+      },
+      "statsd_connection_string": "",
+      "statsd_prefix": ""
+
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tyk-dashboard
+  labels:
+    app: tyk-dashboard
+spec:
+  replicas: 1
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: tyk-dashboard
+  template:
+    metadata:
+      labels:
+        app: tyk-dashboard
+      annotations:
+    spec:
+      containers:
+      - image: tykio/tyk-dashboard:v4.0.1
+        imagePullPolicy: IfNotPresent
+        name: tyk-dashboard
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          privileged: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - all
+        env:
+          - name: TYK_LOGLEVEL
+            value: "debug"              
+        resources:
+          limits:
+            memory: 2Gi
+            cpu: 1
+          requests:
+            memory: 1Gi
+            cpu: 0.5
+        command: ["/opt/tyk-dashboard/tyk-analytics", "--conf=/etc/tyk-dashboard/tyk_analytics.conf"]
+        workingDir: /opt/tyk-dashboard
+        ports:
+        - containerPort: 3000
+        volumeMounts:
+          - name: tyk-dashboard-conf
+            mountPath: /etc/tyk-dashboard
+        livenessProbe:
+          httpGet:
+            scheme: "HTTP"
+            path: /
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 2
+          timeoutSeconds: 3
+          failureThreshold: 2
+        readinessProbe:
+          httpGet:
+            scheme: "HTTP"
+            path: /
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 2000
+      volumes:
+        - name: tyk-dashboard-conf
+          configMap:
+            name: tyk-dashboard-conf
+            items:
+              - key: tyk_analytics.conf
+                path: tyk_analytics.conf
