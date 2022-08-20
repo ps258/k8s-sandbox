@@ -1,6 +1,13 @@
 #!/usr/bin/ksh -u
 
-# bring up minikube and deploy a basic install
+# command to manage tyk instances in distinct namespaces
+
+# todo: be able to set the version used
+#				expose redis and mongo ports
+#				autoload APIs
+#				retrieve credentials
+#				deploy with MDCB
+#				deploy with postgresql
 
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
@@ -48,8 +55,8 @@ function waitPodReady {
 	podname=$(getPodName $1)
 	echo -n "[INFO]Waiting for $NAMESPACE:$podname to start"
 	while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
-		sleep 5
 		echo -n .
+		sleep 5
 	done
 	echo
 }
@@ -80,14 +87,17 @@ function applyYAML {
 	typeset YAMLfile
 	YAML=""
 	for YAMLfile in $*; do
-		YAML="$YAML -f $YAMLDIR/$YAMLfile"
+		YAMLfile=$(basename $YAMLfile)
+		if [[ -f $YAMLDIR/$YAMLfile ]]; then
+			YAML="$YAML -f $YAMLDIR/$YAMLfile"
+		fi
 	done
 	kubectl apply -n $NAMESPACE $YAML
 }
 
 function licenseDashboard {
 	if [[ -n $SBX_LICENSE ]]; then
-		curl -k -s -d "license=$SBX_LICENSE" http://$minikubeIP:$(getDashboardPort)/license
+		curl -s -d "license=$SBX_LICENSE" http://$minikubeIP:$(getDashboardPort)/license
 	fi
 }
 
@@ -125,9 +135,10 @@ if [[ $# -gt 0 ]]; then
 			echo "[INFO]Starting dashboard, pump and gateway"
 			applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml
 			waitPodReady tyk-dashboard
-			reportSanboxInfo 
 			licenseDashboard
 			addDashboardUser
+			listPods
+			reportSanboxInfo 
 			;;
 		delete | rm | del)
 			shift
