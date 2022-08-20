@@ -25,6 +25,19 @@ function getPodName {
 	kubectl get pods --no-headers=true -n $namespace | awk '/^'$2'/ {print $1}'
 }
 
+function help {
+	typeset name
+	name=$(basename $SCRIPTNAME)
+	echo "[USAGE]:"
+	echo "$name create <intance tag>"
+	echo "      Create a tyk instance the name space given as a tag"
+	echo "$name delete <instance tag>"
+	echo "      Delete the namespace given as a tag and all resources in it"
+	echo "$name list"
+	echo "      List all namespaces"
+	echo "$name info <instance tag>"
+	echo "      Print info on the particular instance"
+}
 
 # wait for a pod to start
 function waitPodReady {
@@ -75,39 +88,48 @@ function applyYAML {
 
 # start of script
 # make sure ninikube is running and populate minikubeIP, the minikubeIP address it uses
-startMinikube
 
-case $1 in 
-	create)
-		shift
-		if [[ $# -lt 1 ]]; then
-			echo "[FATAL]Must provide namespace"
-			exit 1
-		fi
-		NAMESPACE=$1
-		createNamespace $NAMESPACE
-		echo "[INFO]Starting redis and mongo"
-		applyYAML $NAMESPACE mongo.yaml redis.yaml
-		waitPodReady $NAMESPACE redis
-		waitPodReady $NAMESPACE mongo
-		sleep 5
-		echo "[INFO]Starting dashboard, pump and gateway"
-		applyYAML $NAMESPACE tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml
-		waitPodReady $NAMESPACE tyk-dashboard
-		reportSanboxInfo $NAMESPACE
-		;;
-	delete)
-		shift
-		if [[ $# -lt 1 ]]; then
-			echo "[FATAL]Must provide namespace"
-			exit 1
-		fi
-		kubectl delete namespace $*
-		;;
-	list)
-		kubectl get namespaces
-		;;
-	*)
-		echo "[FATAL]$1 not implemented"
-		;;
-esac
+if [[ $# -gt 0 ]]; then
+	startMinikube
+	case $1 in 
+		create)
+			shift
+			if [[ $# -lt 1 ]]; then
+				echo "[FATAL]Must provide namespace"
+				exit 1
+			fi
+			NAMESPACE=$1
+			createNamespace $NAMESPACE
+			echo "[INFO]Starting redis and mongo"
+			applyYAML $NAMESPACE mongo.yaml redis.yaml
+			waitPodReady $NAMESPACE redis
+			waitPodReady $NAMESPACE mongo
+			sleep 5
+			echo "[INFO]Starting dashboard, pump and gateway"
+			applyYAML $NAMESPACE tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml
+			waitPodReady $NAMESPACE tyk-dashboard
+			reportSanboxInfo $NAMESPACE
+			;;
+		delete | rm | del)
+			shift
+			if [[ $# -lt 1 ]]; then
+				echo "[FATAL]Must provide namespace"
+				exit 1
+			fi
+			kubectl delete namespace $*
+			;;
+		list)
+			kubectl get namespaces
+			;;
+		info)
+			shift
+			NAMESPACE=$1
+			reportSanboxInfo $NAMESPACE
+			;;
+		*)
+			echo "[FATAL]$1 not implemented"
+			;;
+	esac
+else
+	help
+fi
