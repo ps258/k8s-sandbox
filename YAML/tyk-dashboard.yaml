@@ -7,17 +7,16 @@ metadata:
 data:
   tyk_analytics.conf: |-
     {
-
       "listen_port": 3000,
       "tyk_api_config": {
-        "Host": "http://tyk-gateway",
+        "Host": "https://tyk-gateway",
         "Port": "8080",
-        "Secret": "12345"
+        "Secret": "Secret"
       },
       "mongo_url": "mongodb://mongo-db/tyk_analytics",
       "page_size": 10,
-      "admin_secret": "352d20ee67be67f6340b4c0605b044b7",
-      "shared_node_secret": "352d20ee67be67f6340b4c0605b044b7",
+      "admin_secret": "admin_secret",
+      "shared_node_secret": "shared_node_secret",
       "redis_port": 6379,
       "redis_host": "redis-db",
       "redis_password": "",
@@ -27,17 +26,15 @@ data:
       "notify_on_change": true,
       "redis_database": 0,
       "redis_hosts": null,
-      "hash_keys": true,
+      "hash_keys": false,
       "enable_delete_key_by_hash": true,
       "enable_update_key_by_hash": true,
+      "enable_hashed_keys_listing": true,
       "enable_duplicate_slugs": true,
       "enable_multi_org_users": true,
       "show_org_id": true,
       "host_config": {
-        "generate_secure_paths": false,
-        "hostname": "tyk-dashboard",
         "enable_host_names": true,
-        "override_hostname": "tyk-gateway:8080",
         "disable_org_slug_prefix": true,
         "portal_root_path": "/portal",
         "use_strict_hostmatch": false
@@ -45,8 +42,6 @@ data:
       "http_server_options": {
         "use_ssl": false,
         "ssl_insecure_skip_verify": true,
-        "certificates": [
-        ],
         "min_version": 0
       },
       "ui": {
@@ -92,11 +87,10 @@ data:
         "detailed_recording": true
       },
       "security": {
-        "audit_log_path": "/var/log/tyk-dashboard_audit.log"
+        "audit_log_path": "/var/log/tyk-dashboard-security_audit.log"
       },
       "statsd_connection_string": "",
       "statsd_prefix": ""
-
     }
 ---
 apiVersion: apps/v1
