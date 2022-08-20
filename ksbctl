@@ -1,4 +1,4 @@
-#!/usr/bin/ksh
+#!/usr/bin/ksh -u
 
 # bring up minikube and deploy a basic install
 
@@ -9,6 +9,11 @@ SCRIPTDIR=$(
   echo $PWD
 )
 YAMLDIR="$SCRIPTDIR/YAML"
+NAMESPACE_SELECTOR="purpose=support"
+
+# load env variables
+ENVFILE=~/.tyk-sandbox
+. $ENVFILE
 
 # start minikube if it's not already running
 function startMinikube {
@@ -20,9 +25,7 @@ function startMinikube {
 }
 
 function getPodName {
-	typeset namespace=$1
-	typeset name=$2
-	kubectl get pods --no-headers=true -n $namespace | awk '/^'$2'/ {print $1}'
+	kubectl get pods --no-headers=true -n $NAMESPACE | awk '/^'$1'/ {print $1}'
 }
 
 function help {
@@ -41,53 +44,55 @@ function help {
 
 # wait for a pod to start
 function waitPodReady {
-	typeset namespace
 	typeset podname
-	namespace=$1
-	podname=$(getPodName $namespace $2)
-	echo -n "[INFO]Waiting for $namespect:$podname to be ready"
-	while [[ $( kubectl get pods --no-headers=true -n $namespace "$podname" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
+	podname=$(getPodName $1)
+	echo -n "[INFO]Waiting for $NAMESPACE:$podname to start"
+	while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
 		sleep 5
 		echo -n .
 	done
 	echo
 }
 
+function getDashboardPort {
+	kubectl get svc -n $NAMESPACE tyk-dashboard --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
+function getGatewayPort {
+	kubectl get svc -n $NAMESPACE tyk-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
 function reportSanboxInfo {
-	typeset namespace=$1
-	typeset dashboardPodName
-	typeset dashboardPort
-	typeset gatewayPort
-	dashboardPodName=$(getPodName $namespace tyk-dashboard)
-	dashboardPort=$(kubectl get svc -n $namespace tyk-dashboard --no-headers=true | awk -F '[:/ ]+' '{print $6}')
-	gatewayPort=$(kubectl get svc -n $namespace tyk-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}')
-	echo "$namespace.dashboard: http://$minikubeIP:$dashboardPort/"
-	echo "$namespace.gateway:   http://$minikubeIP:$gatewayPort/"
+	echo "$NAMESPACE.dashboard: http://$minikubeIP:$(getDashboardPort $NAMESPACE)/"
+	echo "$NAMESPACE.gateway:   http://$minikubeIP:$(getGatewayPort $NAMESPACE)/"
 }
 
 function createNamespace {
-	typeset namespace
-	namespace=$1
-	if ! kubectl get namespaces | grep -wq $namespace; then
+	if ! kubectl get namespaces | grep -wq $NAMESPACE; then
 		kubectl create ns $NAMESPACE
-		echo "[INFO]Created namespace '$namespace'"
+		kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR
+		echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
 }
 
 function applyYAML {
-	typeset namespace
 	typeset YAML
 	typeset YAMLfile
-	namespace=$1
-	shift
+	YAML=""
 	for YAMLfile in $*; do
 		YAML="$YAML -f $YAMLDIR/$YAMLfile"
 	done
-	kubectl apply -n $namespace $YAML
+	kubectl apply -n $NAMESPACE $YAML
 }
 
-# start of script
-# make sure ninikube is running and populate minikubeIP, the minikubeIP address it uses
+function licenseDashboard {
+	if [[ -n $SBX_LICENSE ]]; then
+		curl -k -s -d "license=$SBX_LICENSE" http://$minikubeIP:$(getDashboardPort $NAMESPACE)/license
+	fi
+}
+
+# Process commands and take actions
+# make sure minikube is running and populate minikubeIP, the minikubeIP address it uses
 
 if [[ $# -gt 0 ]]; then
 	startMinikube
@@ -99,16 +104,17 @@ if [[ $# -gt 0 ]]; then
 				exit 1
 			fi
 			NAMESPACE=$1
-			createNamespace $NAMESPACE
+			createNamespace
 			echo "[INFO]Starting redis and mongo"
-			applyYAML $NAMESPACE mongo.yaml redis.yaml
-			waitPodReady $NAMESPACE redis
-			waitPodReady $NAMESPACE mongo
+			applyYAML mongo.yaml redis.yaml
+			waitPodReady redis
+			waitPodReady mongo
 			sleep 5
 			echo "[INFO]Starting dashboard, pump and gateway"
-			applyYAML $NAMESPACE tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml
-			waitPodReady $NAMESPACE tyk-dashboard
-			reportSanboxInfo $NAMESPACE
+			applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml
+			waitPodReady tyk-dashboard
+			reportSanboxInfo 
+			licenseDashboard
 			;;
 		delete | rm | del)
 			shift
@@ -119,12 +125,12 @@ if [[ $# -gt 0 ]]; then
 			kubectl delete namespace $*
 			;;
 		list)
-			kubectl get namespaces
+			kubectl get namespaces --selector=$NAMESPACE_SELECTOR
 			;;
 		info)
 			shift
 			NAMESPACE=$1
-			reportSanboxInfo $NAMESPACE
+			reportSanboxInfo
 			;;
 		*)
 			echo "[FATAL]$1 not implemented"
