@@ -99,6 +99,10 @@ function addDashboardUser {
 	fi
 }
 
+function listPods {
+	kubectl get pods -n $NAMESPACE
+}
+
 # Process commands and take actions
 # make sure minikube is running and populate minikubeIP, the minikubeIP address it uses
 
@@ -119,7 +123,7 @@ if [[ $# -gt 0 ]]; then
 			waitPodReady mongo
 			sleep 5
 			echo "[INFO]Starting dashboard, pump and gateway"
-			applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml
+			applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml
 			waitPodReady tyk-dashboard
 			reportSanboxInfo 
 			licenseDashboard
@@ -136,9 +140,15 @@ if [[ $# -gt 0 ]]; then
 		list)
 			kubectl get namespaces --selector=$NAMESPACE_SELECTOR
 			;;
+		pods)
+			shift
+			NAMESPACE=$1
+			listPods
+			;;
 		info)
 			shift
 			NAMESPACE=$1
+			listPods
 			reportSanboxInfo
 			;;
 		*)
