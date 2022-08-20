@@ -63,8 +63,8 @@ function getGatewayPort {
 }
 
 function reportSanboxInfo {
-	echo "$NAMESPACE.dashboard: http://$minikubeIP:$(getDashboardPort $NAMESPACE)/"
-	echo "$NAMESPACE.gateway:   http://$minikubeIP:$(getGatewayPort $NAMESPACE)/"
+	echo "$NAMESPACE.dashboard: http://$minikubeIP:$(getDashboardPort)/"
+	echo "$NAMESPACE.gateway:   http://$minikubeIP:$(getGatewayPort)/"
 }
 
 function createNamespace {
@@ -87,7 +87,15 @@ function applyYAML {
 
 function licenseDashboard {
 	if [[ -n $SBX_LICENSE ]]; then
-		curl -k -s -d "license=$SBX_LICENSE" http://$minikubeIP:$(getDashboardPort $NAMESPACE)/license
+		curl -k -s -d "license=$SBX_LICENSE" http://$minikubeIP:$(getDashboardPort)/license
+	fi
+}
+
+function addDashboardUser {
+	if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
+		SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
+		# this bootstrap method is reliable for versions 2.9.x - 3.2.x (won't work on 2.8.x or earlier)
+		curl -s -d "email_address=$SBX_USER&first_name=Tyk&last_name=Admin&password=$SBX_CLEAR_PASSWORD&confirm_password=$SBX_CLEAR_PASSWORD" http://$minikubeIP:$(getDashboardPort)/bootstrap
 	fi
 }
 
@@ -115,6 +123,7 @@ if [[ $# -gt 0 ]]; then
 			waitPodReady tyk-dashboard
 			reportSanboxInfo 
 			licenseDashboard
+			addDashboardUser
 			;;
 		delete | rm | del)
 			shift
