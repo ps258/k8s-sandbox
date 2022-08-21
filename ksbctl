@@ -2,11 +2,16 @@
 
 # command to manage tyk instances in distinct namespaces
 
+# Dependencies
+#  ksh to support arrays. the Mac version of bash doesn't
+#  envsubst to populate environment variables into the YAML
+
 # todo: be able to set the version used
+#       use envsubst to create sandboxes of different versions
 #				expose redis and mongo ports
-#				autoload APIs
 #				retrieve credentials
-#				deploy with MDCB
+#				  autoload APIs
+#				  deploy with MDCB
 #				deploy with postgresql
 
 SCRIPTNAME=$0
@@ -20,7 +25,13 @@ NAMESPACE_SELECTOR="purpose=support"
 
 # load env variables
 ENVFILE=~/.tyk-sandbox
-. $ENVFILE
+if [[ -f $ENVFILE ]]; then
+	. $ENVFILE
+else
+	SBX_LICENSE=""
+	SBX_USER=""
+	SBX_PASSWORD=""
+fi
 
 # start minikube if it's not already running
 function startMinikube {
@@ -58,7 +69,7 @@ function waitPodReady {
 		echo -n .
 		sleep 5
 	done
-	echo
+	echo " done"
 }
 
 function getDashboardPort {
@@ -106,6 +117,13 @@ function addDashboardUser {
 		SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
 		# this bootstrap method is reliable for versions 2.9.x - 3.2.x (won't work on 2.8.x or earlier)
 		curl -s -d "email_address=$SBX_USER&first_name=Tyk&last_name=Admin&password=$SBX_CLEAR_PASSWORD&confirm_password=$SBX_CLEAR_PASSWORD" http://$minikubeIP:$(getDashboardPort)/bootstrap
+	fi
+}
+
+function addAPIs {
+	if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
+		# only attempt if we've got a username and password because we need a auth ID
+		:
 	fi
 }
 
