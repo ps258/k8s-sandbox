@@ -7,12 +7,16 @@
 #  envsubst to populate environment variables into the YAML
 
 # todo: be able to set the version used
-#       use envsubst to create sandboxes of different versions
+#       create index of versions that can be used
+#         use envsubst to create sandboxes of different versions
 #				expose redis and mongo ports
 #				retrieve credentials
 #				  autoload APIs
 #				  deploy with MDCB
 #				deploy with postgresql
+#       create way to deploy plugins
+#         golang
+#         python/lua
 
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
