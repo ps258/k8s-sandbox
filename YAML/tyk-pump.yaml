@@ -79,7 +79,7 @@ spec:
       annotations:
     spec:
       containers:
-      - image: tykio/tyk-pump-docker-pub:v1.6
+      - image: tykio/tyk-pump-docker-pub:$KSBX_PUMP_VERS
         imagePullPolicy: IfNotPresent
         name: tyk-pump
         securityContext:

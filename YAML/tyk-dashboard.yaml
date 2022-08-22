@@ -117,7 +117,7 @@ spec:
       annotations:
     spec:
       containers:
-      - image: tykio/tyk-dashboard:v4.0.1
+      - image: tykio/tyk-dashboard:$KSBX_DASH_VERS
         imagePullPolicy: IfNotPresent
         name: tyk-dashboard
         securityContext:

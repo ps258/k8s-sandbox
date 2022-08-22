@@ -117,7 +117,7 @@ metadata:
   labels:
     app: tyk-gateway
 spec:
-  replicas: 3
+  replicas: 1
   minReadySeconds: 5
   strategy:
     # indicate which strategy we want for rolling update
@@ -135,7 +135,7 @@ spec:
       annotations:
     spec:
       containers:
-      - image: tykio/tyk-gateway:v4.0.0
+      - image: tykio/tyk-gateway:$KSBX_GATE_VERS
         imagePullPolicy: IfNotPresent
         name: tyk-gateway
         securityContext:

@@ -3,6 +3,7 @@
 # command to manage tyk instances in distinct namespaces
 
 # Dependencies
+#  minikube to run a local kubernetes
 #  ksh to support arrays. the Mac version of bash doesn't
 #  envsubst to populate environment variables into the YAML
 
@@ -24,6 +25,7 @@ SCRIPTDIR=$(
   cd "$(dirname $SCRIPTNAME)"
   echo $PWD
 )
+VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
 YAMLDIR="$SCRIPTDIR/YAML"
 NAMESPACE_SELECTOR="purpose=support"
 
@@ -72,6 +74,10 @@ function waitPodReady {
 	while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
 		echo -n .
 		sleep 5
+		if kubectl logs -n $NAMESPACE "$podname" 2>&1 | grep -q 'trying and failing to pull image'; then
+			echo; echo "[FATAL]Unable to pull image for '$podname'"
+			exit 1
+		fi
 	done
 	echo " done"
 }
@@ -98,6 +104,18 @@ function createNamespace {
 }
 
 function applyYAML {
+	typeset YAML
+	typeset YAMLfile
+	YAML=""
+	for YAMLfile in $*; do
+		YAMLfile=$(basename $YAMLfile)
+		if [[ -f $YAMLDIR/$YAMLfile ]]; then
+			cat $YAMLDIR/$YAMLfile | envsubst | tee -a /tmp/images | kubectl apply -n $NAMESPACE -f -
+		fi
+	done
+}
+
+function OldapplyYAML {
 	typeset YAML
 	typeset YAMLfile
 	YAML=""
@@ -135,6 +153,24 @@ function listPods {
 	kubectl get pods -n $NAMESPACE
 }
 
+# isolated to keep IFS from leaking
+function loadVersions {
+  typeset line
+  typeset IFS
+  typeset gwVers
+  typeset dshbVers
+  typeset pumpVers
+  typeset TIBvers
+  typeset syncVers
+  typeset version
+  line=$1
+  IFS=,
+  echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers
+	export KSBX_GATE_VERS="v${gwVers%%-*}"
+	export KSBX_DASH_VERS="v${dshbVers%%-*}"
+	export KSBX_PUMP_VERS="v${pumpVers%%-*}"
+}
+
 # Process commands and take actions
 # make sure minikube is running and populate minikubeIP, the minikubeIP address it uses
 
@@ -143,11 +179,31 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			if [[ $# -lt 1 ]]; then
-				echo "[FATAL]Must provide namespace"
+			while getopts v:t: arg; do
+				case $arg in
+					t)
+						NAMESPACE=$OPTARG
+						;;
+					v)
+						imageVersion=$OPTARG
+						;;
+					:)
+						echo "Option -$OPTARG requires an arguement."
+						exit 1
+						;;
+					\?)
+						echo "Invalid option: -$OPTARG"
+						exit 1
+						;;
+				esac
+			done
+			if egrep -q "^$imageVersion," $VERSIONFILE; then
+				loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1)
+				echo "Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
+			else
+				echo "Unable to find '$imageVersion' in '$VERSIONFILE'"
 				exit 1
 			fi
-			NAMESPACE=$1
 			createNamespace
 			echo "[INFO]Starting redis and mongo"
 			applyYAML mongo.yaml redis.yaml
