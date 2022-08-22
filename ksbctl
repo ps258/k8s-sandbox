@@ -175,11 +175,19 @@ if [[ $# -gt 0 ]]; then
 			;;
 		pods)
 			shift
+			if [[ $# -lt 1 ]]; then
+				echo "[FATAL]Must provide namespace"
+				exit 1
+			fi
 			NAMESPACE=$1
 			listPods
 			;;
 		info)
 			shift
+			if [[ $# -lt 1 ]]; then
+				echo "[FATAL]Must provide namespace"
+				exit 1
+			fi
 			NAMESPACE=$1
 			listPods
 			reportSanboxInfo
