@@ -1,4 +1,4 @@
-#!/usr/bin/ksh -u
+#!/bin/ksh -u
 
 # command to manage tyk instances in distinct namespaces
 
@@ -198,7 +198,7 @@ if [[ $# -gt 0 ]]; then
 						;;
 				esac
 			done
-			if [[ -z $NAMESPACE || -n $imageVersion ]]; then
+			if [[ -z $NAMESPACE || -z $imageVersion ]]; then
 				echo "[FATAL]Both -v and -t must be set"
 				help
 				exit 1
