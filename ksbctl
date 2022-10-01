@@ -29,6 +29,8 @@ SCRIPTDIR=$(
 VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
 YAMLDIR="$SCRIPTDIR/YAML"
 NAMESPACE_SELECTOR="purpose=support"
+NAMESPACE=''
+imageVersion=''
 
 # load env variables
 ENVFILE=~/.tyk-sandbox
@@ -84,14 +86,26 @@ function waitPodReady {
 }
 
 function getDashboardPort {
-	kubectl get svc -n $NAMESPACE tyk-dashboard --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+	typeset dashboardService
+	dashboardService=$(kubectl get svc -n $NAMESPACE | awk '$1 ~ /dashboard/ {print $1}' | head -1)
+	kubectl get svc -n $NAMESPACE $dashboardService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getGatewayPort {
-	kubectl get svc -n $NAMESPACE tyk-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+	typeset gatewayService
+	gatewayService=$(kubectl get svc -n $NAMESPACE | awk '$1 ~ /gateway/ {print $1}' | head -1)
+	kubectl get svc -n $NAMESPACE $gatewayService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function reportSanboxInfo {
+	typeset description
+	typeset label
+	for label in $(kubectl get namespaces --show-labels --selector=$NAMESPACE_SELECTOR | awk '/^tyk / {print $NF}' | xargs -d,); do
+		if echo $label | grep -q description=; then
+			description=$(echo $label | cut -d= -f2)
+			echo "$NAMESPACE.description: $description"
+		fi
+	done
 	echo "$NAMESPACE.dashboard: http://$minikubeIP:$(getDashboardPort)/"
 	echo "$NAMESPACE.gateway:   http://$minikubeIP:$(getGatewayPort)/"
 }
@@ -183,7 +197,7 @@ if [[ $# -gt 0 ]]; then
 			while getopts v:t: arg; do
 				case $arg in
 					t)
-						NAMESPACE=$OPTARG
+						NAMESPACE=$(echo $OPTARG | sed 's/ /-/g')
 						;;
 					v)
 						imageVersion=$OPTARG
@@ -203,6 +217,8 @@ if [[ $# -gt 0 ]]; then
 				help
 				exit 1
 			fi
+			KSBX_NS=$NAMESPACE
+			export KSBX_NS
 			if egrep -q "^$imageVersion," $VERSIONFILE; then
 				loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1)
 				echo "Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
@@ -215,9 +231,8 @@ if [[ $# -gt 0 ]]; then
 			applyYAML mongo.yaml redis.yaml # grpc-plugin.yaml
 			waitPodReady redis
 			waitPodReady mongo
-			sleep 5
 			echo "[INFO]Starting dashboard, pump and gateway"
-			applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml
+			applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml 
 			waitPodReady tyk-dashboard
 			licenseDashboard
 			addDashboardUser
@@ -254,9 +269,15 @@ if [[ $# -gt 0 ]]; then
 				echo "[FATAL]Must provide namespace"
 				exit 1
 			fi
-			NAMESPACE=$1
-			listPods
-			reportSanboxInfo
+			for NAMESPACE in $*; do
+				echo "[INFO]$NAMESPACE"
+				if kubectl get namespaces --selector=$NAMESPACE_SELECTOR 2>&1 | grep -q $NAMESPACE; then
+					listPods
+					reportSanboxInfo
+				else
+					echo "[WARN]Namespace '$NAMESPACE' not found"
+				fi
+			done
 			;;
 		*)
 			echo "[FATAL]$1 not implemented"
