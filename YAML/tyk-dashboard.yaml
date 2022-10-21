@@ -139,8 +139,8 @@ spec:
             scheme: "HTTP"
             path: /
             port: 3000
-          initialDelaySeconds: 60
-          periodSeconds: 2
+          initialDelaySeconds: 20
+          periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 2
         readinessProbe:
@@ -148,13 +148,10 @@ spec:
             scheme: "HTTP"
             path: /
             port: 3000
-          initialDelaySeconds: 60
+          initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
-      securityContext:
-        runAsUser: 1000
-        fsGroup: 2000
       volumes:
         - name: tyk-dashboard-conf
           configMap:

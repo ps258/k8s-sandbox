@@ -64,7 +64,6 @@ spec:
   replicas: 1
   minReadySeconds: 5
   strategy:
-    # indicate which strategy we want for rolling update
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 2
@@ -83,12 +82,9 @@ spec:
         imagePullPolicy: IfNotPresent
         name: tyk-pump
         securityContext:
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          privileged: false
-          capabilities:
-            drop:
-              - all
+          runAsNonRoot: false
+          allowPrivilegeEscalation: true
+          privileged: true
         env:
           - name: TYK_LOGLEVEL
             value: "debug"
@@ -104,7 +100,7 @@ spec:
             scheme: "HTTP"
             path: /health
             port: 8083
-          initialDelaySeconds: 60
+          initialDelaySeconds: 10
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 2
@@ -113,13 +109,10 @@ spec:
             scheme: "HTTP"
             path: /health
             port: 8083
-          initialDelaySeconds: 60
+          initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
-      securityContext:
-        runAsUser: 1000
-        fsGroup: 2000
       volumes:
         - name: tyk-pump-conf
           configMap:
