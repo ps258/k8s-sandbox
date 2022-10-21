@@ -19,7 +19,3 @@ spec:
         - image: tbi:latest
           name: tbi
           imagePullPolicy: IfNotPresent
-          resources:
-            requests:
-              cpu: 500m
-              memory: 1000Mi

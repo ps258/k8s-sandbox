@@ -32,13 +32,6 @@ spec:
           capabilities:
             drop:
               - all
-        resources:
-          limits:
-            memory: 1Gi
-            cpu: 1
-          requests:
-            memory: 512Mi
-            cpu: 0.5
         command: ["/grpc_plugin"]
         workingDir: /
         ports:

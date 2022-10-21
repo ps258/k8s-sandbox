@@ -127,13 +127,6 @@ spec:
         env:
           - name: TYK_LOGLEVEL
             value: "debug"              
-        resources:
-          limits:
-            memory: 2Gi
-            cpu: 1
-          requests:
-            memory: 1Gi
-            cpu: 0.5
         command: ["/opt/tyk-dashboard/tyk-analytics", "--conf=/etc/tyk-dashboard/tyk_analytics.conf"]
         workingDir: /opt/tyk-dashboard
         ports:

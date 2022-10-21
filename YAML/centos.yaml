@@ -29,12 +29,5 @@ spec:
           runAsNonRoot: false
           allowPrivilegeEscalation: true
           privileged: true
-        resources:
-          limits:
-            memory: 1Gi
-            cpu: 1
-          requests:
-            memory: 512Mi
-            cpu: 0.5
         command: ["/usr/bin/sleep", "infinity"]
         workingDir: /
