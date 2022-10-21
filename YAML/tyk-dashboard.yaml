@@ -121,13 +121,9 @@ spec:
         imagePullPolicy: IfNotPresent
         name: tyk-dashboard
         securityContext:
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          privileged: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-              - all
+          runAsNonRoot: false
+          allowPrivilegeEscalation: true
+          privileged: true
         env:
           - name: TYK_LOGLEVEL
             value: "debug"              

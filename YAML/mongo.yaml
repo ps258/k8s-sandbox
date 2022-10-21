@@ -20,15 +20,16 @@ spec:
         tier: backend
     spec:
       containers:
-        - name: master
-          image: mongo
-          resources:
-            requests:
-              cpu: 500m
-              memory: 1000Mi
-          ports:
-            - containerPort: 27017
----        
+      - name: master
+        image: mongo:4.4.17
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1000Mi
+        ports:
+        - containerPort: 27017
+
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -39,8 +40,10 @@ metadata:
     tier: backend
 spec:
   ports:
-    - port: 27017
-      targetPort: 27017
+  - port: 27017
+    protocol: TCP
+    targetPort: 27017
+  type: NodePort
   selector:
     app: mongo
     role: master
