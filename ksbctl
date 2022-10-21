@@ -46,7 +46,7 @@ fi
 function startMinikube {
 	if ! minikube status > /dev/null 2>&1 ;then
 		echo "[INFO]Starting minikube"
-		#minikube start --driver docker
+		#minikube start --driver docker --cpus max --memory max
 		minikube start
 	fi
 	minikubeIP=$(minikube ip)
