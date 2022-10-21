@@ -46,7 +46,8 @@ fi
 function startMinikube {
 	if ! minikube status > /dev/null 2>&1 ;then
 		echo "[INFO]Starting minikube"
-		minikube start --driver docker
+		#minikube start --driver docker
+		minikube start
 	fi
 	minikubeIP=$(minikube ip)
 }
@@ -85,6 +86,18 @@ function waitPodReady {
 	echo " done"
 }
 
+function getMongoPort {
+	typeset mongoService
+	mongoService=$(kubectl get svc -n $NAMESPACE | awk '$1 ~ /mongo/ {print $1}' | head -1)
+	kubectl get svc -n $NAMESPACE $mongoService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
+function getRedisPort {
+	typeset redisService
+	redisService=$(kubectl get svc -n $NAMESPACE | awk '$1 ~ /redis/ {print $1}' | head -1)
+	kubectl get svc -n $NAMESPACE $redisService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
 function getDashboardPort {
 	typeset dashboardService
 	dashboardService=$(kubectl get svc -n $NAMESPACE | awk '$1 ~ /dashboard/ {print $1}' | head -1)
@@ -108,6 +121,8 @@ function reportSanboxInfo {
 	done
 	echo "$NAMESPACE.dashboard: http://$minikubeIP:$(getDashboardPort)/"
 	echo "$NAMESPACE.gateway:   http://$minikubeIP:$(getGatewayPort)/"
+	echo "$NAMESPACE.mongo:     mongo --quiet --host $minikubeIP --port $(getMongoPort)"
+	echo "$NAMESPACE.redis:     redis-cli -h $minikubeIP -p $(getRedisPort)"
 }
 
 function createNamespace {
@@ -118,6 +133,7 @@ function createNamespace {
 	fi
 }
 
+# process the YAML with envsubst to substitute environment variables into them
 function applyYAML {
 	typeset YAML
 	typeset YAMLfile
@@ -232,7 +248,7 @@ if [[ $# -gt 0 ]]; then
 			waitPodReady redis
 			waitPodReady mongo
 			echo "[INFO]Starting dashboard, pump and gateway"
-			applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml 
+			applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml
 			waitPodReady tyk-dashboard
 			licenseDashboard
 			addDashboardUser
