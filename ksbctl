@@ -6,25 +6,46 @@
 #  minikube to run a local kubernetes
 #  ksh to support arrays. the Mac version of bash doesn't
 #  envsubst to populate environment variables into the YAML
+#  mongosh to retrieve things from mongodb (what?)
+#  redis-cli to retrieve admin credentials
 
-# todo: be able to set the version used
-#       create index of versions that can be used
-#         use envsubst to create sandboxes of different versions
-#				expose redis and mongo ports
-#				retrieve credentials
-#				  autoload APIs
-#				  deploy with MDCB
-#				deploy with postgresql
-#       create way to deploy plugins
-#         golang
-#         python/lua
+# todo: 
+#		(done) be able to set the version used
+#			(done) create index of versions that can be used
+#			(done) use envsubst to create sandboxes of different versions
+#			Save versions in label and display them in the info/list commands
+#		test for needed commands
+#			minikube
+#				allow creation of cluster if not present
+#			envsubst
+#			mongo shell
+#			redis-cli
+#		test on other platforms
+#			windows
+#			MacOS
+#				M1
+#		(done) expose redis and mongo ports
+#		retrieve credentials from redis
+#			display creds when asked
+#			autoload APIs
+#		deploy with MDCB
+#		deploy with postgresql
+#		create way to deploy plugins
+#			bundle server
+#			golang
+#			python/lua
+#		Convenience commands
+#			logs
+#			shell
+#			performance stats
+#			publish APIs
 
 alias kubectl="minikube kubectl -- "
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
 SCRIPTDIR=$(
-  cd "$(dirname $SCRIPTNAME)"
-  echo $PWD
+	cd "$(dirname $SCRIPTNAME)"
+	echo $PWD
 )
 VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
 YAMLDIR="$SCRIPTDIR/YAML"
@@ -186,17 +207,17 @@ function listPods {
 
 # isolated to keep IFS from leaking
 function loadVersions {
-  typeset line
-  typeset IFS
-  typeset gwVers
-  typeset dshbVers
-  typeset pumpVers
-  typeset TIBvers
-  typeset syncVers
-  typeset version
-  line=$1
-  IFS=,
-  echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers
+	typeset line
+	typeset IFS
+	typeset gwVers
+	typeset dshbVers
+	typeset pumpVers
+	typeset TIBvers
+	typeset syncVers
+	typeset version
+	line=$1
+	IFS=,
+	echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers
 	export KSBX_GATE_VERS="v${gwVers%%-*}"
 	export KSBX_DASH_VERS="v${dshbVers%%-*}"
 	export KSBX_PUMP_VERS="v${pumpVers%%-*}"
