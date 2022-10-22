@@ -36,6 +36,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #		create way to deploy plugins
 #			bundle server
 #			golang
+#     share plugin folders with sbctl
 #			python/lua
 #		Convenience commands
 #			logs
