@@ -25,8 +25,8 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			windows
 #			MacOS
 #				M1
-#		Better checking of pod startup.
-#			Warn if pods in 'Pending' and exit
+#		(done) Better checking of pod startup.
+#			(done) Warn if pods in 'Pending' and exit
 #		(done) expose redis and mongo ports
 #		retrieve credentials from redis
 #			display creds when asked
@@ -42,6 +42,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			shell
 #			performance stats
 #			publish APIs
+#			shell into the container running the cluster
 
 alias kubectl="minikube kubectl -- "
 SCRIPTNAME=$0
@@ -139,13 +140,22 @@ function help {
 function waitPodReady {
 	typeset podname
 	podname=$(getPodName $1)
-	echo -n "[INFO]Waiting for $NAMESPACE:$podname to start"
+	echo -n "[INFO]Waiting for $NAMESPACE:$podname to start."
 	while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
 		echo -n .
 		sleep 5
 		if kubectl logs -n $NAMESPACE "$podname" 2>&1 | grep -q 'trying and failing to pull image'; then
 			echo; echo "[FATAL]Unable to pull image for '$podname'"
 			exit 1
+		fi
+		# Pending pods mean there aren't enough resources. Warn and exit
+		if kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | grep -qi 'pending'; then
+			# give it some time to find a place for the pod
+			sleep 5
+			if kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | grep -qi 'pending'; then
+				echo; echo "[FATAL]Not enough resources in the cluster to run $podname"
+				exit 1
+			fi
 		fi
 	done
 	echo " done"
@@ -226,7 +236,8 @@ function OldapplyYAML {
 
 function licenseDashboard {
 	if [[ -n $SBX_LICENSE ]]; then
-		curl -s -d "license=$SBX_LICENSE" http://$minikubeIP:$(getDashboardPort)/license
+		echo "[INFO]Licenseing the dashboard"
+		curl -s -d "license=$SBX_LICENSE" http://$minikubeIP:$(getDashboardPort)/license > /dev/null
 	fi
 }
 
@@ -234,7 +245,8 @@ function addDashboardUser {
 	if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
 		SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
 		# this bootstrap method is reliable for versions 2.9.x - 3.2.x (won't work on 2.8.x or earlier)
-		curl -s -d "email_address=$SBX_USER&first_name=Tyk&last_name=Admin&password=$SBX_CLEAR_PASSWORD&confirm_password=$SBX_CLEAR_PASSWORD" http://$minikubeIP:$(getDashboardPort)/bootstrap
+		echo "[INFO]Adding admin account $SBX_USER"
+		curl -s -d "email_address=$SBX_USER&first_name=Tyk&last_name=Admin&password=$SBX_CLEAR_PASSWORD&confirm_password=$SBX_CLEAR_PASSWORD" http://$minikubeIP:$(getDashboardPort)/bootstrap > /dev/null
 	fi
 }
 
@@ -284,11 +296,11 @@ if [[ $# -gt 0 ]]; then
 						imageVersion=$OPTARG
 						;;
 					:)
-						echo "Option -$OPTARG requires an arguement."
+						echo "[FATAL]Option -$OPTARG requires an arguement."
 						exit 1
 						;;
 					\?)
-						echo "Invalid option: -$OPTARG"
+						echo "[FATAL]Invalid option: -$OPTARG"
 						exit 1
 						;;
 				esac
@@ -302,9 +314,9 @@ if [[ $# -gt 0 ]]; then
 			export KSBX_NS
 			if egrep -q "^$imageVersion," $VERSIONFILE; then
 				loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1)
-				echo "Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
+				echo "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
 			else
-				echo "Unable to find '$imageVersion' in '$VERSIONFILE'"
+				echo "[FATAL]Unable to find '$imageVersion' in '$VERSIONFILE'"
 				exit 1
 			fi
 			createNamespace
