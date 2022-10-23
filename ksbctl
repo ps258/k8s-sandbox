@@ -128,13 +128,13 @@ function help {
 	typeset name
 	name=$(basename $SCRIPTNAME)
 	echo "[USAGE]:"
-	echo "$name create -v <tyk version> -t <intance tag>"
+	echo "$name create -v <tyk version> -t <namespace>"
 	echo "      Create a tyk instance the name space given as a tag"
-	echo "$name delete <instance tag>"
+	echo "$name delete <namespace>"
 	echo "      Delete the namespace given as a tag and all resources in it"
 	echo "$name list"
 	echo "      List all namespaces"
-	echo "$name info <instance tag>"
+	echo "$name info <namespace>"
 	echo "      Print info on the particular instance"
 }
 
@@ -358,6 +358,8 @@ if [[ $# -gt 0 ]]; then
 				waitPodReady redis
 				waitPodReady mongo
 				echo "[INFO]Starting dashboard, pump and gateway"
+				# setup configmaps first
+				applyYAML tyk-dashboard-configmap-mongo.yaml tyk-gateway-configmap-mongo.yaml tyk-pump-configmap-mongo.yaml
 				applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml
 				waitPodReady tyk-dashboard
 				licenseDashboard

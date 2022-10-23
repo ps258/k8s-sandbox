@@ -10,4 +10,3 @@ spec:
   type: NodePort
   selector:
     app: tyk-dashboard
-
