@@ -29,8 +29,8 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #		(done) Better checking of pod startup.
 #			(done) Warn if pods in 'Pending' and exit
 #		(done) expose redis and mongo ports
-#		retrieve credentials from redis
-#			display creds when asked
+#		(done) retrieve credentials from redis
+#			(done) display admin creds when asked
 #			autoload APIs
 #		deploy with MDCB
 #		deploy with postgresql
@@ -40,7 +40,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #     share plugin folders with sbctl
 #			python/lua
 #		Convenience commands
-#			logs
+#			(done) logs
 #			(done) shell
 #			performance stats
 #			publish APIs
@@ -70,34 +70,29 @@ else
 fi
 
 function checkMinikubeInstalled {
-	if ! which minikube >/dev/null
-	then
+	if ! which minikube >/dev/null; then
 		echo "[FATAL]Command 'minikube' not found. Cannot continue"
 		exit 1
 	fi
 }
 
 function checkEnvsubstInstalled {
-	if ! which envsubst >/dev/null
-	then
+	if ! which envsubst >/dev/null; then
 		echo "[FATAL]Command 'envsubst' not found. Cannot continue"
 		exit 1
 	fi
 }
 
 function checkRedisCliInstalled {
-	if ! which redis-cli >/dev/null
-	then
+	if ! which redis-cli >/dev/null; then
 		echo "[FATAL]Command 'redis-cli' not found. Cannot continue"
 		exit 1
 	fi
 }
 
 function checkMongoShellInstalled {
-	if ! which mongo >/dev/null
-	then
-		if which mongosh /dev/null
-		then
+	if ! which mongo >/dev/null; then
+		if which mongosh /dev/null; then
 			alias mongo=mongosh
 		else
 			echo "[FATAL]Mongo shell 'mongo' or 'mongosh' not installed. Cannot continue"
@@ -163,6 +158,20 @@ function waitPodReady {
 	echo " done"
 }
 
+function getAdminUserKey {
+	typeset redisPort
+	typeset redisKey
+	redisPort=$(getRedisPort)
+	for redisKey in $(redis-cli -h $minikubeIP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
+		if [[ $(redis-cli -h $minikubeIP -p $redisPort type $redisKey) == 'string' ]]; then
+			if [[ "admin" == $(redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
+				redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.access_key 
+				return 0
+			fi
+		fi
+	done
+}
+
 function getMongoPort {
 	typeset mongoService
 	mongoService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /mongo/ {print $1}' | head -1)
@@ -203,8 +212,7 @@ function reportSanboxInfo {
 }
 
 function createNamespace {
-	if ! namespaceExists $NAMESPACE
-	then
+	if ! namespaceExists $NAMESPACE; then
 		kubectl create ns $NAMESPACE
 		kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR
 		echo "[INFO]Created namespace '$NAMESPACE'"
@@ -298,8 +306,7 @@ function runShell {
 			# if ncurses-base isnt installed then TERM isn't recognised
 			# I found it was installed in some images but not others
 			echo "[INFO]Checking for ncurses-base in $pod"
-			if ! kubectl exec $pod -n $NAMESPACE -- test -d /lib/terminfo >/dev/null 2>&1
-			then
+			if ! kubectl exec $pod -n $NAMESPACE -- test -d /lib/terminfo >/dev/null 2>&1; then
 				echo "[INFO]Installing ncurses-base to provide terminal types to the shell"
 				kubectl exec $pod -n $NAMESPACE -- apt install ncurses-base -y > /dev/null 2>&1
 			fi
@@ -308,6 +315,14 @@ function runShell {
 			kubectl exec $pod -n $NAMESPACE -it -- /bin/bash
 		done
 	done
+}
+
+function showLogs {
+	typeset podType
+	typeset pod
+	podType=$1
+	pod=$(kubectl get pods -n $NAMESPACE | awk '/'$podType'/ {print $1}' | head -1)
+	kubectl logs -n $NAMESPACE $pod -f
 }
 
 # Process commands and take actions
@@ -340,8 +355,7 @@ if [[ $# -gt 0 ]]; then
 				help
 				exit 1
 			fi
-			if ! namespaceExists $NAMESPACE
-			then
+			if ! namespaceExists $NAMESPACE; then
 				# export namespace for envsubst to pick up
 				KSBX_NS=$NAMESPACE
 				export KSBX_NS
@@ -386,6 +400,16 @@ if [[ $# -gt 0 ]]; then
 		list)
 			kubectl get namespaces --selector=$NAMESPACE_SELECTOR
 			;;
+		log*)
+			shift
+      if [[ $# -lt 1 ]]; then
+        echo "[FATAL]Must provide namespace"
+        exit 1
+      fi
+      NAMESPACE=$1
+			shift
+			showLogs $1
+			;;
 		pods)
 			shift
 			if [[ $# -lt 1 ]]; then
@@ -403,9 +427,10 @@ if [[ $# -gt 0 ]]; then
 			fi
 			for NAMESPACE in $*; do
 				echo "[INFO]$NAMESPACE"
-				if kubectl get namespaces --selector=$NAMESPACE_SELECTOR 2>&1 | grep -q $NAMESPACE; then
+				if namespaceExists $NAMESPACE; then
 					listPods
 					reportSanboxInfo
+					echo "$NAMESPACE.AdminKey:  $(getAdminUserKey)"
 				else
 					echo "[WARN]Namespace '$NAMESPACE' not found"
 				fi
