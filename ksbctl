@@ -69,42 +69,33 @@ else
 	SBX_PASSWORD=""
 fi
 
-function checkMinikubeInstalled {
-	if ! which minikube >/dev/null; then
-		echo "[FATAL]Command 'minikube' not found. Cannot continue"
-		exit 1
-	fi
-}
-
-function checkEnvsubstInstalled {
-	if ! which envsubst >/dev/null; then
-		echo "[FATAL]Command 'envsubst' not found. Cannot continue"
-		exit 1
-	fi
-}
-
-function checkRedisCliInstalled {
-	if ! which redis-cli >/dev/null; then
-		echo "[FATAL]Command 'redis-cli' not found. Cannot continue"
-		exit 1
-	fi
+function checkCommandInstalled {
+	typeset cmd
+	for cmd in $*; do
+		if ! which $cmd >/dev/null; then
+			echo "[FATAL]Command '$cmd' not found. Cannot continue"
+			exit 1
+		fi
+	done
 }
 
 function checkMongoShellInstalled {
 	if ! which mongo >/dev/null; then
-		if which mongosh /dev/null; then
+		if which mongosh > /dev/null; then
 			alias mongo=mongosh
+			MONGOSHELL=mongosh
 		else
 			echo "[FATAL]Mongo shell 'mongo' or 'mongosh' not installed. Cannot continue"
 			exit 1
 		fi
+	else
+			MONGOSHELL=mongo
 	fi
 }
 
 # check for command dependencies
-checkMinikubeInstalled
-checkRedisCliInstalled
-checkMinikubeInstalled
+checkMongoShellInstalled
+checkCommandInstalled minikube redis-cli jqx envsubst
 
 # create or start minikube if it's not already running
 function startMinikube {
@@ -207,7 +198,7 @@ function reportSanboxInfo {
 	done
 	echo "$NAMESPACE.dashboard: http://$minikubeIP:$(getDashboardPort)/"
 	echo "$NAMESPACE.gateway:   http://$minikubeIP:$(getGatewayPort)/"
-	echo "$NAMESPACE.mongo:     mongo --quiet --host $minikubeIP --port $(getMongoPort)"
+	echo "$NAMESPACE.mongo:     $MONGOSHELL --quiet --host $minikubeIP --port $(getMongoPort)"
 	echo "$NAMESPACE.redis:     redis-cli -h $minikubeIP -p $(getRedisPort)"
 }
 
