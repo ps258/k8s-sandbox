@@ -16,7 +16,8 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			(done) create index of versions that can be used
 #			(done) use envsubst to create sandboxes of different versions
 #			Save versions in label and display them in the info/list commands
-#			Set versions for mongo/redis and postgresql too
+#			Set versions for mdcb, mongo/redis and postgresql too
+#			Allow commandline override of versions of all components
 #		(done) test for command dependencies
 #			(done) minikube
 #				(done) allow creation of cluster if not present
@@ -280,10 +281,32 @@ function loadVersions {
 	export KSBX_PUMP_VERS="v${pumpVers%%-*}"
 }
 
-# Process commands and take actions
-# make sure minikube is running and populate minikubeIP, the minikubeIP address it uses
+function runShell {
+	typeset podType
+	typeset pod
+	for podType in $*
+	do
+		echo "[INFO]Creating shell for $podType"
+		for pod in $(kubectl get pods -n $NAMESPACE | awk '/'$podType'/ {print $1}')
+		do
+			# if ncurses-base isnt installed then TERM isn't recognised
+			# I found it was installed in some images but not others
+			echo "[INFO]Checking for ncurses-base in $pod"
+			if ! kubectl exec $pod -n $NAMESPACE -- test -d /lib/terminfo >/dev/null 2>&1
+			then
+				echo "[INFO]Installing ncurses-base to provide terminal types to the shell"
+				kubectl exec $pod -n $NAMESPACE -- apt install ncurses-base -y > /dev/null 2>&1
+			fi
+			echo "[INFO]starting bash in $pod"
+			#echo "kubectl exec $pod -n $NAMESPACE -it -- /bin/bash"
+			kubectl exec $pod -n $NAMESPACE -it -- /bin/bash
+		done
+	done
+}
 
+# Process commands and take actions
 if [[ $# -gt 0 ]]; then
+	# make sure minikube is running and populate minikubeIP, the minikubeIP address it uses
 	startMinikube
 	case $1 in 
 		create)
@@ -311,6 +334,7 @@ if [[ $# -gt 0 ]]; then
 				help
 				exit 1
 			fi
+			# export namespace for envsubst to pick up
 			KSBX_NS=$NAMESPACE
 			export KSBX_NS
 			if egrep -q "^$imageVersion," $VERSIONFILE; then
@@ -372,6 +396,16 @@ if [[ $# -gt 0 ]]; then
 					echo "[WARN]Namespace '$NAMESPACE' not found"
 				fi
 			done
+			;;
+		shell)
+			shift
+			if [[ $# -lt 1 ]]; then
+				echo "[FATAL]Must provide namespace"
+				exit 1
+			fi
+			NAMESPACE=$1
+			shift
+			runShell $*
 			;;
 		*)
 			echo "[FATAL]$1 not implemented"
