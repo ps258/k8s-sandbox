@@ -41,7 +41,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			python/lua
 #		Convenience commands
 #			logs
-#			shell
+#			(done) shell
 #			performance stats
 #			publish APIs
 #			shell into the container running the cluster
@@ -165,32 +165,32 @@ function waitPodReady {
 
 function getMongoPort {
 	typeset mongoService
-	mongoService=$(kubectl get svc -n $NAMESPACE | awk '$1 ~ /mongo/ {print $1}' | head -1)
+	mongoService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /mongo/ {print $1}' | head -1)
 	kubectl get svc -n $NAMESPACE $mongoService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getRedisPort {
 	typeset redisService
-	redisService=$(kubectl get svc -n $NAMESPACE | awk '$1 ~ /redis/ {print $1}' | head -1)
+	redisService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /redis/ {print $1}' | head -1)
 	kubectl get svc -n $NAMESPACE $redisService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getDashboardPort {
 	typeset dashboardService
-	dashboardService=$(kubectl get svc -n $NAMESPACE | awk '$1 ~ /dashboard/ {print $1}' | head -1)
+	dashboardService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /dashboard/ {print $1}' | head -1)
 	kubectl get svc -n $NAMESPACE $dashboardService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getGatewayPort {
 	typeset gatewayService
-	gatewayService=$(kubectl get svc -n $NAMESPACE | awk '$1 ~ /gateway/ {print $1}' | head -1)
+	gatewayService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /gateway/ {print $1}' | head -1)
 	kubectl get svc -n $NAMESPACE $gatewayService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function reportSanboxInfo {
 	typeset description
 	typeset label
-	for label in $(kubectl get namespaces --show-labels --selector=$NAMESPACE_SELECTOR | awk '/^tyk / {print $NF}' | xargs -d,); do
+	for label in $(kubectl get namespaces --show-labels --selector=$NAMESPACE_SELECTOR --no-headers=true | awk '/^tyk / {print $NF}' | xargs -d,); do
 		if echo $label | grep -q description=; then
 			description=$(echo $label | cut -d= -f2)
 			echo "$NAMESPACE.description: $description"
@@ -203,11 +203,17 @@ function reportSanboxInfo {
 }
 
 function createNamespace {
-	if ! kubectl get namespaces | grep -wq $NAMESPACE; then
+	if ! namespaceExists $NAMESPACE
+	then
 		kubectl create ns $NAMESPACE
 		kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR
 		echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
+}
+
+function namespaceExists {
+	kubectl get namespaces --no-headers=true | grep -wq $NAMESPACE
+	return $?
 }
 
 # process the YAML with envsubst to substitute environment variables into them
@@ -298,7 +304,7 @@ function runShell {
 				kubectl exec $pod -n $NAMESPACE -- apt install ncurses-base -y > /dev/null 2>&1
 			fi
 			echo "[INFO]starting bash in $pod"
-			#echo "kubectl exec $pod -n $NAMESPACE -it -- /bin/bash"
+			echo "[INFO]kubectl exec $pod -n $NAMESPACE -it -- /bin/bash"
 			kubectl exec $pod -n $NAMESPACE -it -- /bin/bash
 		done
 	done
@@ -334,28 +340,34 @@ if [[ $# -gt 0 ]]; then
 				help
 				exit 1
 			fi
-			# export namespace for envsubst to pick up
-			KSBX_NS=$NAMESPACE
-			export KSBX_NS
-			if egrep -q "^$imageVersion," $VERSIONFILE; then
-				loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1)
-				echo "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
+			if ! namespaceExists $NAMESPACE
+			then
+				# export namespace for envsubst to pick up
+				KSBX_NS=$NAMESPACE
+				export KSBX_NS
+				if egrep -q "^$imageVersion," $VERSIONFILE; then
+					loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1)
+					echo "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
+				else
+					echo "[FATAL]Unable to find '$imageVersion' in '$VERSIONFILE'"
+					exit 1
+				fi
+				createNamespace
+				echo "[INFO]Starting redis and mongo"
+				applyYAML mongo.yaml redis.yaml # grpc-plugin.yaml
+				waitPodReady redis
+				waitPodReady mongo
+				echo "[INFO]Starting dashboard, pump and gateway"
+				applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml
+				waitPodReady tyk-dashboard
+				licenseDashboard
+				addDashboardUser
+				listPods
+				reportSanboxInfo 
 			else
-				echo "[FATAL]Unable to find '$imageVersion' in '$VERSIONFILE'"
+				echo "[FATAL]Namespace '$NAMESPACE' already exists"
 				exit 1
 			fi
-			createNamespace
-			echo "[INFO]Starting redis and mongo"
-			applyYAML mongo.yaml redis.yaml # grpc-plugin.yaml
-			waitPodReady redis
-			waitPodReady mongo
-			echo "[INFO]Starting dashboard, pump and gateway"
-			applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml
-			waitPodReady tyk-dashboard
-			licenseDashboard
-			addDashboardUser
-			listPods
-			reportSanboxInfo 
 			;;
 		delete | rm | del)
 			shift
