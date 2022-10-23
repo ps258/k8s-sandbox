@@ -95,7 +95,7 @@ function checkMongoShellInstalled {
 
 # check for command dependencies
 checkMongoShellInstalled
-checkCommandInstalled minikube redis-cli jqx envsubst
+checkCommandInstalled minikube redis-cli jq envsubst
 
 # create or start minikube if it's not already running
 function startMinikube {
