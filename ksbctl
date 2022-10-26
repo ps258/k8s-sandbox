@@ -12,6 +12,9 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #  redis-cli to retrieve admin credentials
 
 # todo: 
+#		Use volumes to hold persistent data
+#			Mongodb
+#			Redis
 #		(done) be able to set the version used
 #			(done) create index of versions that can be used
 #			(done) use envsubst to create sandboxes of different versions
