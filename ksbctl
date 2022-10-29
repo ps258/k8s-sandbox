@@ -14,6 +14,11 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 # todo: 
 #		Use volumes to hold persistent data
 #			Mongodb
+#				https://github.com/kubernetes/minikube/issues/7511#issuecomment-1022222474
+#				add to /etc/tmpfiles.d/tmp.conf
+#  				-D /tmp 1777 root root -
+#					+d /tmp 1777 root root 1s
+#					+x /tmp/hostpath-provisioner/*
 #			Redis
 #		(done) be able to set the version used
 #			(done) create index of versions that can be used
@@ -72,6 +77,24 @@ else
 	SBX_PASSWORD=""
 fi
 
+function help {
+	typeset name
+	name=$(basename $SCRIPTNAME)
+	echo "[USAGE]:"
+	echo "$name create -v <tyk version> -t <namespace>"
+	echo "      Create a tyk instance the name space given as a tag"
+	echo "$name delete <namespace>"
+	echo "      Delete the namespace given as a tag and all resources in it"
+	echo "$name list"
+	echo "      List all namespaces"
+	echo "$name info <namespace>"
+	echo "      Print info on the particular instance"
+	echo "$name shell <namespace> <pod>"
+	echo "      Start an interactive shell in the pod."
+	echo "      The pod name can be a substring of the actual name"
+	echo "      eg. $name shell ns1 dashboard"
+}
+
 function checkCommandInstalled {
 	typeset cmd
 	for cmd in $*; do
@@ -113,42 +136,34 @@ function getPodName {
 	kubectl get pods --no-headers=true -n $NAMESPACE | awk '/^'$1'/ {print $1}'
 }
 
-function help {
-	typeset name
-	name=$(basename $SCRIPTNAME)
-	echo "[USAGE]:"
-	echo "$name create -v <tyk version> -t <namespace>"
-	echo "      Create a tyk instance the name space given as a tag"
-	echo "$name delete <namespace>"
-	echo "      Delete the namespace given as a tag and all resources in it"
-	echo "$name list"
-	echo "      List all namespaces"
-	echo "$name info <namespace>"
-	echo "      Print info on the particular instance"
-}
-
 # wait for a pod to start
 function waitPodReady {
 	typeset podname
 	podname=$(getPodName $1)
-	echo -n "[INFO]Waiting for $NAMESPACE:$podname to start."
-	while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
-		echo -n .
-		sleep 5
-		if kubectl logs -n $NAMESPACE "$podname" 2>&1 | grep -q 'trying and failing to pull image'; then
-			echo; echo "[FATAL]Unable to pull image for '$podname'"
-			exit 1
-		fi
-		# Pending pods mean there aren't enough resources. Warn and exit
-		if kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | grep -qi 'pending'; then
-			# give it some time to find a place for the pod
+	if [[ -n $podname ]]; then
+
+		echo -n "[INFO]Waiting for $NAMESPACE:$podname to start."
+		while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
+			echo -n .
 			sleep 5
-			if kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | grep -qi 'pending'; then
-				echo; echo "[FATAL]Not enough resources in the cluster to run $podname"
+			if kubectl logs -n $NAMESPACE "$podname" 2>&1 | grep -q 'trying and failing to pull image'; then
+				echo; echo "[FATAL]Unable to pull image for '$podname'"
 				exit 1
 			fi
-		fi
-	done
+			# Pending pods mean there aren't enough resources. Warn and exit
+			if kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | grep -qi 'pending'; then
+				# give it some time to find a place for the pod
+				sleep 5
+				if kubectl get pods --no-headers=true -n $NAMESPACE "$podname" | grep -qi 'pending'; then
+					echo; echo "[FATAL]Not enough resources in the cluster to run $podname"
+					exit 1
+				fi
+			fi
+		done
+	else
+		echo "[FATAL]Cannot find a pod matching '$1'"
+		exit 1
+	fi
 	echo " done"
 }
 
@@ -218,7 +233,12 @@ function namespaceExists {
 	return $?
 }
 
-# process the YAML with envsubst to substitute environment variables into them
+# Process the YAML with envsubst to substitute environment variables into them
+# All exported environment varables are available to envsubst but these are the main ones
+# KSBX_GATE_VERS which has the gateway version. This is used to pull the gateway docker image
+# KSBX_DASH_VERS which has the dashboard version. This is used to pull the dashboard docker image
+# KSBX_PUMP_VERS which has the pump version. This is used to pull the pump docker image
+# KSBX_NS which is the namespace for the pods etc.
 function applyYAML {
 	typeset YAML
 	typeset YAMLfile
