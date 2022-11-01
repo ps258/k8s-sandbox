@@ -339,6 +339,16 @@ function showLogs {
 	kubectl logs -n $NAMESPACE $pod -f
 }
 
+# Sometimes the PersistentVolumeClaim is left when the namespace is deleted.
+# Tidy it up
+function tidyPVCs {
+	typeset pvc
+	for pvc in $(kubectl get pv --no-headers=true 2>/dev/null | awk '$5=="Released" {print $1}'); do
+		echo "[INFO]kubectl delete pv $pvc"
+		kubectl delete pv $pvc
+	done
+}
+
 # Process commands and take actions
 if [[ $# -gt 0 ]]; then
 	# make sure minikube is running and populate minikubeIP, the minikubeIP address it uses
@@ -406,6 +416,7 @@ if [[ $# -gt 0 ]]; then
 				exit 1
 			fi
 			kubectl delete namespace $*
+			tidyPVCs
 			;;
 		help)
 			help
