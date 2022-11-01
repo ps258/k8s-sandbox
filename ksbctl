@@ -128,6 +128,9 @@ function startMinikube {
 	if ! minikube status > /dev/null 2>&1 ;then
 		echo "[INFO]Starting minikube"
 		minikube start --driver docker --cpus max --memory max
+		minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
+		# give it a few seconds to settle down
+		sleep 10
 	fi
 	minikubeIP=$(minikube ip)
 }
