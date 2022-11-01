@@ -181,6 +181,20 @@ function getAdminUserKey {
 	done
 }
 
+function getOrgID {
+	typeset redisPort
+	typeset redisKey
+	redisPort=$(getRedisPort)
+	for redisKey in $(redis-cli -h $minikubeIP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
+		if [[ $(redis-cli -h $minikubeIP -p $redisPort type $redisKey) == 'string' ]]; then
+			if [[ "admin" == $(redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
+				redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.org_id
+				return 0
+			fi
+		fi
+	done
+}
+
 function getMongoPort {
 	typeset mongoService
 	mongoService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /mongo/ {print $1}' | head -1)
@@ -456,6 +470,7 @@ if [[ $# -gt 0 ]]; then
 					listPods
 					reportSanboxInfo
 					echo "$NAMESPACE.AdminKey:  $(getAdminUserKey)"
+					echo "$NAMESPACE.OrgID:     $(getOrgID)"
 				else
 					echo "[WARN]Namespace '$NAMESPACE' not found"
 				fi
