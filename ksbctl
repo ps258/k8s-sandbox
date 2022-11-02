@@ -12,14 +12,14 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #  redis-cli to retrieve admin credentials
 
 # todo: 
-#		Use volumes to hold persistent data
-#			Mongodb
+#		(done) Use volumes to hold persistent data
+#			(done) Mongodb
 #				https://github.com/kubernetes/minikube/issues/7511#issuecomment-1022222474
 #				add to /etc/tmpfiles.d/tmp.conf
 #  				-D /tmp 1777 root root -
 #					+d /tmp 1777 root root 1s
 #					+x /tmp/hostpath-provisioner/*
-#			Redis
+#			(done) Redis
 #		(done) be able to set the version used
 #			(done) create index of versions that can be used
 #			(done) use envsubst to create sandboxes of different versions
@@ -39,7 +39,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #		(done) expose redis and mongo ports
 #		(done) retrieve credentials from redis
 #			(done) display admin creds when asked
-#			autoload APIs
+#			(done) autoload APIs
 #		deploy with MDCB
 #		deploy with postgresql
 #		create way to deploy plugins
@@ -51,7 +51,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			(done) logs
 #			(done) shell
 #			performance stats
-#			publish APIs
+#			(done) publish APIs
 #			shell into the container running the cluster
 
 alias kubectl="minikube kubectl -- "
@@ -235,6 +235,8 @@ function reportSanboxInfo {
 	echo "$NAMESPACE.gateway:   http://$minikubeIP:$(getGatewayPort)/"
 	echo "$NAMESPACE.mongo:     $MONGOSHELL --quiet --host $minikubeIP --port $(getMongoPort)"
 	echo "$NAMESPACE.redis:     redis-cli -h $minikubeIP -p $(getRedisPort)"
+	echo "$NAMESPACE.AdminKey:  $(getAdminUserKey)"
+	echo "$NAMESPACE.OrgID:     $(getOrgID)"
 }
 
 function createNamespace {
@@ -356,13 +358,47 @@ function showLogs {
 	kubectl logs -n $NAMESPACE $pod -f
 }
 
-# Sometimes the PersistentVolumeClaim is left when the namespace is deleted.
-# Tidy it up
+# Sometimes PersistentVolumeClaim are left when the namespace is deleted.
+# Tidy up any in state 'Released'
 function tidyPVCs {
 	typeset pvc
 	for pvc in $(kubectl get pv --no-headers=true 2>/dev/null | awk '$5=="Released" {print $1}'); do
 		echo "[INFO]kubectl delete pv $pvc"
 		kubectl delete pv $pvc
+	done
+}
+
+function createApiDefintion {
+  # converts API definition format from the one given using 'export' on the dashboard to the one expected when importing via /api/apis
+  typeset APIfile
+  APIfile="$1"
+  echo '  {'
+  echo '    "api_model": {},'
+  echo '    "api_definition":' $(<"$APIfile") ','
+  echo '    "hook_references": [],'
+  echo '    "is_site": false,'
+  echo '    "sort_by": 0'
+  echo '}'
+}
+
+function publishAPIs {
+	typeset APIfile
+	typeset adminKey
+	typeset DashboardPort
+	adminKey=$(getAdminUserKey)
+	DashboardPort=$(getDashboardPort)
+	for APIfile in "$@"; do
+		echo "[INFO]Publishing API $APIfile"
+		if grep -q api_definition "$APIfile"; then
+			# deal with the files that are a copy and paste of the API JSON from the dashboard
+			curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$minikubeIP:$DashboardPort/api/apis -d@"$APIfile" > /dev/null
+		else
+			# deal with the files that are exported APIs from the dashboard
+			APIfileName=$(mktemp /tmp/$(basename "$APIfile").XXXXXX)
+			createApiDefintion "$APIfile" > $APIfileName
+			curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$minikubeIP:$DashboardPort/api/apis -d@"$APIfileName" > /dev/null
+			\rm $APIfileName
+		fi
 	done
 }
 
@@ -419,6 +455,7 @@ if [[ $# -gt 0 ]]; then
 				waitPodReady tyk-dashboard
 				licenseDashboard
 				addDashboardUser
+				publishAPIs $SCRIPTDIR/APIs/*.json
 				listPods
 				reportSanboxInfo 
 			else
@@ -461,6 +498,16 @@ if [[ $# -gt 0 ]]; then
 			NAMESPACE=$1
 			listPods
 			;;
+		publish)
+			shift
+			if [[ $# -lt 1 ]]; then
+        echo "[FATAL]Must provide namespace"
+        exit 1
+      fi
+			NAMESPACE=$1
+			shift
+			publishAPIs "$@"
+			;;
 		info)
 			shift
 			if [[ $# -lt 1 ]]; then
@@ -472,8 +519,6 @@ if [[ $# -gt 0 ]]; then
 				if namespaceExists $NAMESPACE; then
 					listPods
 					reportSanboxInfo
-					echo "$NAMESPACE.AdminKey:  $(getAdminUserKey)"
-					echo "$NAMESPACE.OrgID:     $(getOrgID)"
 				else
 					echo "[WARN]Namespace '$NAMESPACE' not found"
 				fi
