@@ -87,6 +87,8 @@ function help {
 	echo "      Delete the namespace given as a tag and all resources in it"
 	echo "$name list"
 	echo "      List all namespaces"
+	echo "$name logs <namespace> <podname>"
+	echo "      Tail the logs of the named pod"
 	echo "$name info <namespace>"
 	echo "      Print info on the particular instance"
 	echo "$name shell <namespace> <pod>"
