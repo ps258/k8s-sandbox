@@ -1,10 +1,10 @@
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: tyk-gateway
   labels:
     app: tyk-gateway
+    plane: control
 spec:
   replicas: 1
   minReadySeconds: 5
@@ -16,10 +16,12 @@ spec:
   selector:
     matchLabels:
       app: tyk-gateway
+      plane: control
   template:
     metadata:
       labels:
         app: tyk-gateway
+        plane: control
       annotations:
     spec:
       containers:
@@ -61,7 +63,7 @@ spec:
       volumes:
         - name: tyk-gateway-conf
           configMap:
-            name: tyk-gateway-conf
+            name: tyk-gateway-conf-control
             items:
               - key: tyk_gateway.conf
                 path: tyk_gateway.conf

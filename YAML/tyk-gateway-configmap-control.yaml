@@ -1,9 +1,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tyk-gateway-conf
+  name: tyk-gateway-conf-control
   labels:
     app: tyk-gateway
+    plane: control
 data:
   tyk_gateway.conf: |-
     {
@@ -30,7 +31,7 @@ data:
       "app_path": "/opt/tyk-gateway/test_apps/",
       "storage": {
         "type": "redis",
-        "host": "redis-db",
+        "host": "control-redis",
         "port": 6379,
         "hosts": null,
         "username": "",

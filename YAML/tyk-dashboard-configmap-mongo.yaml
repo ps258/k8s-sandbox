@@ -18,7 +18,7 @@ data:
       "admin_secret": "admin_secret",
       "shared_node_secret": "shared_node_secret",
       "redis_port": 6379,
-      "redis_host": "redis-db",
+      "redis_host": "control-redis",
       "redis_password": "",
       "enable_cluster": false,
       "force_api_defaults": false,

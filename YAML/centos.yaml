@@ -4,6 +4,7 @@ metadata:
   name: centos
   labels:
     app: centos
+    plane: control
 spec:
   replicas: 1
   minReadySeconds: 5
@@ -19,6 +20,7 @@ spec:
     metadata:
       labels:
         app: centos
+        plane: control
       annotations:
     spec:
       containers:

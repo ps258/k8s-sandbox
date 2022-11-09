@@ -4,6 +4,7 @@ metadata:
   name: tyk-pump
   labels:
     app: tyk-pump
+    plane: control
 spec:
   replicas: 1
   minReadySeconds: 5
@@ -15,10 +16,12 @@ spec:
   selector:
     matchLabels:
       app: tyk-pump
+      plane: control
   template:
     metadata:
       labels:
         app: tyk-pump
+        plane: control
       annotations:
     spec:
       containers:

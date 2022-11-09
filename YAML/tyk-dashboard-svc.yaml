@@ -2,6 +2,9 @@ kind: Service
 apiVersion: v1
 metadata:
   name: tyk-dashboard
+  labels:
+    app: tyk-dashboard
+    plane: control
 spec:
   ports:
   - port: 3000
@@ -10,3 +13,4 @@ spec:
   type: NodePort
   selector:
     app: tyk-dashboard
+    plane: control

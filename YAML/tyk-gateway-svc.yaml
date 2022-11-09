@@ -1,7 +1,10 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: tyk-gateway
+  name: control-gateway
+  labels:
+    app: tyk-gateway
+    plane: control
 spec:
   ports:
     - port: 8080
@@ -10,4 +13,4 @@ spec:
   type: NodePort
   selector:
     app: tyk-gateway
-
+    plane: control

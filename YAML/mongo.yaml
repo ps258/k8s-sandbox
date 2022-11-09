@@ -4,6 +4,7 @@ metadata:
   name: ${KSBX_NS}-mongo-pvc
   labels:
     app: mongo
+    plane: control
 spec:
   accessModes:
     - ReadWriteOnce
@@ -18,6 +19,7 @@ metadata:
   name: mongo-db
   labels:
     app: mongo
+    plane: control
 spec:
   selector:
     matchLabels:
@@ -27,6 +29,7 @@ spec:
     metadata:
       labels:
         app: mongo
+        plane: control
     spec:
       volumes:
         - name: mongo-db-vol
@@ -48,6 +51,7 @@ metadata:
   name: mongo-db
   labels:
     app: mongo
+    plane: control
 spec:
   ports:
   - port: 27017

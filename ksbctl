@@ -175,7 +175,7 @@ function waitPodReady {
 function getAdminUserKey {
 	typeset redisPort
 	typeset redisKey
-	redisPort=$(getRedisPort)
+	redisPort=$(getControlRedisPort)
 	for redisKey in $(redis-cli -h $minikubeIP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
 		if [[ $(redis-cli -h $minikubeIP -p $redisPort type $redisKey) == 'string' ]]; then
 			if [[ "admin" == $(redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
@@ -189,7 +189,7 @@ function getAdminUserKey {
 function getOrgID {
 	typeset redisPort
 	typeset redisKey
-	redisPort=$(getRedisPort)
+	redisPort=$(getControlRedisPort)
 	for redisKey in $(redis-cli -h $minikubeIP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
 		if [[ $(redis-cli -h $minikubeIP -p $redisPort type $redisKey) == 'string' ]]; then
 			if [[ "admin" == $(redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
@@ -203,25 +203,27 @@ function getOrgID {
 function getMongoPort {
 	typeset mongoService
 	mongoService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /mongo/ {print $1}' | head -1)
-	kubectl get svc -n $NAMESPACE $mongoService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+	kubectl get svc -n $NAMESPACE mongo-db --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
-function getRedisPort {
-	typeset redisService
-	redisService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /redis/ {print $1}' | head -1)
-	kubectl get svc -n $NAMESPACE $redisService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+function getEdgeRedisPort {
+	kubectl get svc -n $NAMESPACE edge-redis --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
+function getControlRedisPort {
+	kubectl get svc -n $NAMESPACE control-redis --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getDashboardPort {
-	typeset dashboardService
-	dashboardService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /dashboard/ {print $1}' | head -1)
-	kubectl get svc -n $NAMESPACE $dashboardService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+	kubectl get svc -n $NAMESPACE tyk-dashboard --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
-function getGatewayPort {
-	typeset gatewayService
-	gatewayService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /gateway/ {print $1}' | head -1)
-	kubectl get svc -n $NAMESPACE $gatewayService --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+function getEdgeGatewayPort {
+	kubectl get svc -n $NAMESPACE edge-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
+function getControlGatewayPort {
+	kubectl get svc -n $NAMESPACE control-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function reportSanboxInfo {
@@ -233,12 +235,12 @@ function reportSanboxInfo {
 			echo "$NAMESPACE.description: $description"
 		fi
 	done
-	echo "$NAMESPACE.dashboard: http://$minikubeIP:$(getDashboardPort)/"
-	echo "$NAMESPACE.gateway:   http://$minikubeIP:$(getGatewayPort)/"
-	echo "$NAMESPACE.mongo:     $MONGOSHELL --quiet --host $minikubeIP --port $(getMongoPort)"
-	echo "$NAMESPACE.redis:     redis-cli -h $minikubeIP -p $(getRedisPort)"
-	echo "$NAMESPACE.AdminKey:  $(getAdminUserKey)"
-	echo "$NAMESPACE.OrgID:     $(getOrgID)"
+	echo "$NAMESPACE.dashboard:         http://$minikubeIP:$(getDashboardPort)/"
+	echo "$NAMESPACE.control-gateway:   http://$minikubeIP:$(getControlGatewayPort)/"
+	echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $minikubeIP --port $(getMongoPort)"
+	echo "$NAMESPACE.redis:             redis-cli -h $minikubeIP -p $(getControlRedisPort)"
+	echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
+	echo "$NAMESPACE.OrgID:             $(getOrgID)"
 }
 
 function createNamespace {
@@ -448,11 +450,11 @@ if [[ $# -gt 0 ]]; then
 				createNamespace
 				echo "[INFO]Starting redis and mongo"
 				applyYAML mongo.yaml redis.yaml # grpc-plugin.yaml
-				waitPodReady redis
+				waitPodReady control-redis
 				waitPodReady mongo
 				echo "[INFO]Starting dashboard, pump and gateway"
 				# setup configmaps first
-				applyYAML tyk-dashboard-configmap-mongo.yaml tyk-gateway-configmap-mongo.yaml tyk-pump-configmap-mongo.yaml
+				applyYAML tyk-dashboard-configmap-mongo.yaml tyk-gateway-configmap-control.yaml tyk-pump-configmap-mongo.yaml
 				applyYAML tyk-dashboard.yaml tyk-gateway.yaml tyk-dashboard-svc.yaml tyk-gateway-svc.yaml tyk-pump.yaml
 				waitPodReady tyk-dashboard
 				licenseDashboard

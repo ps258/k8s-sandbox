@@ -4,6 +4,7 @@ metadata:
   name: tyk-dashboard
   labels:
     app: tyk-dashboard
+    plane: control
 spec:
   replicas: 1
   minReadySeconds: 5
@@ -15,10 +16,12 @@ spec:
   selector:
     matchLabels:
       app: tyk-dashboard
+      plane: control
   template:
     metadata:
       labels:
         app: tyk-dashboard
+        plane: control
       annotations:
     spec:
       containers:
