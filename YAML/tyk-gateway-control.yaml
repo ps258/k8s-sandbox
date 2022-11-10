@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tyk-gateway
+  name: control-gateway
   labels:
     app: tyk-gateway
     plane: control
