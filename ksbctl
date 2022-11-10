@@ -266,6 +266,15 @@ function createNamespace {
 	if ! namespaceExists $NAMESPACE; then
 		kubectl create ns $NAMESPACE
 		kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR
+		if [[ -n $KSBX_GATE_VERS ]]; then
+			kubectl label ns $NAMESPACE GW=$KSBX_GATE_VERS
+		fi
+		if [[ -n $KSBX_DASH_VERS ]]; then
+			kubectl label ns $NAMESPACE DASH=$KSBX_DASH_VERS
+		fi
+		if [[ -n $KSBX_PUMP_VERS ]]; then
+			kubectl label ns $NAMESPACE PUMP=$KSBX_PUMP_VERS
+		fi
 		echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
 }
@@ -467,7 +476,7 @@ if [[ $# -gt 0 ]]; then
 					exit 1
 				fi
 				createNamespace
-				echo "[INFO]Starting redis and mongo"
+				echo "[INFO]Starting redis and mongo in the control plane"
 				applyYAML mongo.yaml redis-control.yaml # grpc-plugin.yaml
 				waitDeploymentReady control-redis
 				waitDeploymentReady mongo-db
@@ -477,7 +486,7 @@ if [[ $# -gt 0 ]]; then
 				# create dashboard, control gateway and pump deployments
 				applyYAML tyk-dashboard.yaml tyk-gateway-control.yaml tyk-pump.yaml
 				# create dashboard and control gateway services
-				applyYAML tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml 
+				applyYAML tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
 				waitDeploymentReady tyk-dashboard
 				waitDeploymentReady control-gateway
 				licenseDashboard
