@@ -9,8 +9,9 @@
 
       ./ksbctl
       [USAGE]:
-      ksbctl create -v <tyk version> -t <namespace>
+      ksbctl create -v <tyk version> -t <namespace> -p
           Create a tyk instance the name space given as a tag
+          -p deploy with postgres not mongo
       ksbctl delete <namespace>
           Delete the namespace given as a tag and all resources in it
       ksbctl list

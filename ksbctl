@@ -93,7 +93,7 @@ function help {
 	echo "[USAGE]:"
 	echo "$name create -v <tyk version> -t <namespace> -p"
 	echo "      Create a tyk instance the name space given as a tag"
-	echo "      -p signifies postgres not mongo"
+	echo "      -p deploy with postgres not mongo"
 	echo "$name delete <namespace>"
 	echo "      Delete the namespace given as a tag and all resources in it"
 	echo "$name list"
