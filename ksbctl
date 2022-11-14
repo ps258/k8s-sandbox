@@ -23,7 +23,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #		(done) be able to set the version used
 #			(done) create index of versions that can be used
 #			(done) use envsubst to create sandboxes of different versions
-#			Save versions in label and display them in the info/list commands
+#			(done) Save versions in label and display them in the info/list commands
 #			Set versions for mdcb, mongo/redis and postgresql too
 #			Allow commandline override of versions of all components
 #		(done) test for command dependencies
@@ -41,7 +41,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			(done) display admin creds when asked
 #			(done) autoload APIs
 #		deploy with MDCB
-#		deploy with postgresql
+#		(done) deploy with postgresql
 #		create way to deploy plugins
 #			bundle server
 #			golang
@@ -52,7 +52,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			(done) shell
 #			performance stats
 #			(done) publish APIs
-#			shell into the container running the cluster
+#			(done) shell into the container running the cluster
 
 alias kubectl="minikube kubectl -- "
 SCRIPTNAME=$0
@@ -507,6 +507,12 @@ if [[ $# -gt 0 ]]; then
 				echo "[FATAL]Both -v and -t must be set"
 				help
 				exit 1
+			fi
+			if [[ $DATABASE == 'postgres' ]]; then
+				if ! echo $imageVersion | awk -F. '$1>3{exit 0} $1<4{exit 1}'; then
+					echo "[FATAL]Version must be 4 or later to use postgres"
+					exit 1
+				fi
 			fi
 			if ! namespaceExists $NAMESPACE; then
 				# export namespace for envsubst to pick up
