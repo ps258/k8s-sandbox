@@ -66,6 +66,11 @@ YAMLDIR="$SCRIPTDIR/YAML"
 NAMESPACE_SELECTOR="purpose=support"
 NAMESPACE=''
 imageVersion=''
+KSBX_GATE_VERS=''
+KSBX_DASH_VERS=''
+KSBX_PUMP_VERS=''
+KSBX_MDCB_VERS=''
+KSBX_NS=''
 
 # load env variables
 ENVFILE=~/.tyk-sandbox
@@ -246,14 +251,6 @@ function getControlGatewayPort {
 }
 
 function reportSanboxInfo {
-	typeset description
-	typeset label
-	for label in $(kubectl get namespaces --show-labels --selector=$NAMESPACE_SELECTOR --no-headers=true | awk '/^tyk / {print $NF}' | xargs -d,); do
-		if echo $label | grep -q description=; then
-			description=$(echo $label | cut -d= -f2)
-			echo "$NAMESPACE.description: $description"
-		fi
-	done
 	echo "$NAMESPACE.dashboard:         http://$minikubeIP:$(getDashboardPort)/"
 	echo "$NAMESPACE.control-gateway:   http://$minikubeIP:$(getControlGatewayPort)/"
 	echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $minikubeIP --port $(getMongoPort)"
@@ -267,13 +264,16 @@ function createNamespace {
 		kubectl create ns $NAMESPACE
 		kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR
 		if [[ -n $KSBX_GATE_VERS ]]; then
-			kubectl label ns $NAMESPACE GW=$KSBX_GATE_VERS
+			kubectl label ns $NAMESPACE TYK_GW=$KSBX_GATE_VERS
 		fi
 		if [[ -n $KSBX_DASH_VERS ]]; then
-			kubectl label ns $NAMESPACE DASH=$KSBX_DASH_VERS
+			kubectl label ns $NAMESPACE TYK_DB=$KSBX_DASH_VERS
 		fi
 		if [[ -n $KSBX_PUMP_VERS ]]; then
-			kubectl label ns $NAMESPACE PUMP=$KSBX_PUMP_VERS
+			kubectl label ns $NAMESPACE TYK_PMP=$KSBX_PUMP_VERS
+		fi
+		if [[ -n $KSBX_MDCB_VERS ]]; then
+			kubectl label ns $NAMESPACE TYK_MDCB=$KSBX_MDCB_VERS
 		fi
 		echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
@@ -289,6 +289,7 @@ function namespaceExists {
 # KSBX_GATE_VERS which has the gateway version. This is used to pull the gateway docker image
 # KSBX_DASH_VERS which has the dashboard version. This is used to pull the dashboard docker image
 # KSBX_PUMP_VERS which has the pump version. This is used to pull the pump docker image
+# KSBX_MDCB_VERS which has the MDCB version. This is used to pull the MDCB docker image
 # KSBX_NS which is the namespace for the pods etc.
 function applyYAML {
 	typeset YAML
@@ -340,6 +341,21 @@ function addAPIs {
 
 function listPods {
 	kubectl get pods -n $NAMESPACE
+}
+
+# report the tyk versions saved in the namespace Labels when it was created
+function showTykVersions {
+	typeset label
+	typeset value
+	typeset report
+	report=''
+	for label in TYK_DB TYK_GW TYK_PMP TYK_MDCB; do
+		value=$(kubectl get namespace -L $label $NAMESPACE -o json | jq -r .metadata.labels.$label)
+		if [[ $value != 'null' ]]; then
+			report="$report $label=$value"
+		fi
+	done
+	echo $report
 }
 
 # isolated to keep IFS from leaking
@@ -551,8 +567,9 @@ if [[ $# -gt 0 ]]; then
 				exit 1
 			fi
 			for NAMESPACE in $*; do
-				echo "[INFO]$NAMESPACE"
 				if namespaceExists $NAMESPACE; then
+					echo "[INFO]$NAMESPACE"
+					showTykVersions
 					listPods
 					reportSanboxInfo
 				else
