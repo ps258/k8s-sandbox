@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tyk-pump-conf
+  labels:
+    app: tyk-pump
+    plane: control
+data:
+  pump.conf: |-
+    {
+      "analytics_storage_type": "redis",
+      "analytics_storage_config": { 
+        "type": "redis",
+        "host": "control-redis",
+        "port": 6379,
+        "hosts": null,
+        "username": "",
+        "password": "",
+        "database": 0,
+        "optimisation_max_idle": 10,
+        "optimisation_max_active": 10,
+        "enable_cluster": false
+      },
+      "purge_delay": 2,
+      "pumps": {
+        "sql": {
+          "name": "sql",
+          "meta": {
+            "type": "postgres",
+            "connection_string": "user=${KSBX_PGUSER} password=${KSBX_PGPASSWORD} database=${KSBX_PGDB} host=postgres-db port=5432",
+            "table_sharding": false
+          }
+        },
+        "sql_aggregate": {
+          "name": "sql_aggregate",
+          "meta": {
+            "type": "postgres",
+            "connection_string": "user=${KSBX_PGUSER} password=${KSBX_PGPASSWORD} database=${KSBX_PGDB} host=postgres-db port=5432",
+            "track_all_paths": true,
+            "use_mixed_collection": true
+          }
+        }
+      },
+      "uptime_pump_config": {
+          "uptime_type": "sql",
+          "type": "postgres",
+          "connection_string": "user=${KSBX_PGUSER} password=${KSBX_PGPASSWORD} database=${KSBX_PGDB} host=postgres-db port=5432"
+      },
+      "dont_purge_uptime_data": false,
+      "health_check_endpoint_port": 8083
+    }

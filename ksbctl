@@ -65,12 +65,17 @@ VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
 YAMLDIR="$SCRIPTDIR/YAML"
 NAMESPACE_SELECTOR="purpose=support"
 NAMESPACE=''
+DATABASE=mongo
 imageVersion=''
 KSBX_GATE_VERS=''
 KSBX_DASH_VERS=''
 KSBX_PUMP_VERS=''
 KSBX_MDCB_VERS=''
 KSBX_NS=''
+export MONGOSHELL=''
+export KSBX_PGPASSWORD=password		# default postgres password
+export KSBX_PGUSER=postgresx				# default postgres username
+export KSBX_PGDB=tyk_analytics		# default postgres database
 
 # load env variables
 ENVFILE=~/.tyk-sandbox
@@ -86,8 +91,9 @@ function help {
 	typeset name
 	name=$(basename $SCRIPTNAME)
 	echo "[USAGE]:"
-	echo "$name create -v <tyk version> -t <namespace>"
+	echo "$name create -v <tyk version> -t <namespace> -p"
 	echo "      Create a tyk instance the name space given as a tag"
+	echo "      -p signifies postgres not mongo"
 	echo "$name delete <namespace>"
 	echo "      Delete the namespace given as a tag and all resources in it"
 	echo "$name list"
@@ -104,6 +110,7 @@ function help {
 
 function checkCommandInstalled {
 	typeset cmd
+	echo "[INFO]Checking for these commands: $*"
 	for cmd in $*; do
 		if ! which $cmd >/dev/null; then
 			echo "[FATAL]Command '$cmd' not found. Cannot continue"
@@ -113,27 +120,28 @@ function checkCommandInstalled {
 }
 
 function checkMongoShellInstalled {
-	if ! which mongo >/dev/null; then
-		if which mongosh > /dev/null; then
-			alias mongo=mongosh
-			MONGOSHELL=mongosh
+	if [[ -z $MONGOSHELL ]]; then
+		if ! which mongo >/dev/null; then
+			if which mongosh > /dev/null; then
+				alias mongo=mongosh
+				MONGOSHELL=mongosh
+			else
+				echo "[FATAL]Mongo shell 'mongo' or 'mongosh' not installed. Cannot continue"
+				exit 1
+			fi
 		else
-			echo "[FATAL]Mongo shell 'mongo' or 'mongosh' not installed. Cannot continue"
-			exit 1
+				MONGOSHELL=mongo
 		fi
-	else
-			MONGOSHELL=mongo
 	fi
 }
 
-# check for command dependencies
-checkMongoShellInstalled
-checkCommandInstalled minikube redis-cli jq envsubst
 
 # create or start minikube if it's not already running
 function startMinikube {
 	if ! minikube status > /dev/null 2>&1 ;then
 		echo "[INFO]Starting minikube"
+		# check for command dependencies
+		checkCommandInstalled minikube redis-cli jq envsubst psql
 		minikube start --driver docker --cpus max --memory max
 		minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
 		# give it a few seconds to settle down
@@ -224,6 +232,12 @@ function getOrgID {
 	done
 }
 
+function getPostgresPort {
+	typeset postgresService
+	postgresService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /postgres/ {print $1}' | head -1)
+	kubectl get svc -n $NAMESPACE postgres-db --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
 function getMongoPort {
 	typeset mongoService
 	mongoService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /mongo/ {print $1}' | head -1)
@@ -253,7 +267,13 @@ function getControlGatewayPort {
 function reportSanboxInfo {
 	echo "$NAMESPACE.dashboard:         http://$minikubeIP:$(getDashboardPort)/"
 	echo "$NAMESPACE.control-gateway:   http://$minikubeIP:$(getControlGatewayPort)/"
-	echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $minikubeIP --port $(getMongoPort)"
+	if [[ $DATABASE == 'mongo' ]]; then
+		checkMongoShellInstalled
+		echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $minikubeIP --port $(getMongoPort)"
+	fi
+	if [[ $DATABASE == 'postgres' ]]; then
+		echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$minikubeIP --port=$(getPostgresPort)"
+	fi
 	echo "$NAMESPACE.redis:             redis-cli -h $minikubeIP -p $(getControlRedisPort)"
 	echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
 	echo "$NAMESPACE.OrgID:             $(getOrgID)"
@@ -275,6 +295,7 @@ function createNamespace {
 		if [[ -n $KSBX_MDCB_VERS ]]; then
 			kubectl label ns $NAMESPACE TYK_MDCB=$KSBX_MDCB_VERS
 		fi
+			kubectl label ns $NAMESPACE TYK_DATABASE=$DATABASE
 		echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
 }
@@ -341,6 +362,10 @@ function addAPIs {
 
 function listPods {
 	kubectl get pods -n $NAMESPACE
+}
+
+function getDatabaseType {
+	DATABASE=$(kubectl get namespace $NAMESPACE -o json | jq -r .metadata.labels.TYK_DATABASE)
 }
 
 # report the tyk versions saved in the namespace Labels when it was created
@@ -457,8 +482,11 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts v:t: arg; do
+			while getopts v:t:p arg; do
 				case $arg in
+					p)
+						DATABASE=postgres
+						;;
 					t)
 						NAMESPACE=$(echo $OPTARG | sed 's/ /-/g')
 						;;
@@ -492,13 +520,25 @@ if [[ $# -gt 0 ]]; then
 					exit 1
 				fi
 				createNamespace
-				echo "[INFO]Starting redis and mongo in the control plane"
-				applyYAML mongo.yaml redis-control.yaml # grpc-plugin.yaml
-				waitDeploymentReady control-redis
-				waitDeploymentReady mongo-db
+				if [[ $DATABASE == 'mongo' ]]; then
+					echo "[INFO]Starting redis and mongo in the control plane"
+					applyYAML mongo.yaml redis-control.yaml # grpc-plugin.yaml
+					waitDeploymentReady control-redis
+					waitDeploymentReady mongo-db
+				elif [[ $DATABASE == 'postgres' ]]; then
+					echo "[INFO]Starting redis and postgres in the control plane"
+					applyYAML postgres.yaml redis-control.yaml # grpc-plugin.yaml
+					waitDeploymentReady control-redis
+					waitDeploymentReady postgres-db
+				fi
 				echo "[INFO]Starting dashboard, pump and gateway"
 				# setup configmaps first
-				applyYAML tyk-dashboard-configmap-mongo.yaml tyk-gateway-configmap-control.yaml tyk-pump-configmap-mongo.yaml
+				applyYAML tyk-gateway-configmap-control.yaml
+				if [[ $DATABASE == 'mongo' ]]; then
+					applyYAML tyk-dashboard-configmap-mongo.yaml tyk-pump-configmap-mongo.yaml
+				elif [[ $DATABASE == 'postgres' ]]; then
+					applyYAML tyk-dashboard-configmap-postgres.yaml tyk-pump-configmap-postgres.yaml
+				fi
 				# create dashboard, control gateway and pump deployments
 				applyYAML tyk-dashboard.yaml tyk-gateway-control.yaml tyk-pump.yaml
 				# create dashboard and control gateway services
@@ -568,6 +608,8 @@ if [[ $# -gt 0 ]]; then
 			fi
 			for NAMESPACE in $*; do
 				if namespaceExists $NAMESPACE; then
+					# set DATABASE for this namespace
+					getDatabaseType
 					echo "[INFO]$NAMESPACE"
 					showTykVersions
 					listPods
