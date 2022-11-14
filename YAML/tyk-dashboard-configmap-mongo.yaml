@@ -9,7 +9,7 @@ data:
     {
       "listen_port": 3000,
       "tyk_api_config": {
-        "Host": "http://tyk-gateway",
+        "Host": "http://control-gateway",
         "Port": "8080",
         "Secret": "Secret"
       },
