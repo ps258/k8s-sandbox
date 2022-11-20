@@ -54,7 +54,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			(done) publish APIs
 #			(done) shell into the container running the cluster
 
-alias kubectl="minikube kubectl -- "
+#alias kubectl="minikube kubectl -- "
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
 SCRIPTDIR=$(
@@ -138,16 +138,20 @@ function checkMongoShellInstalled {
 
 # create or start minikube if it's not already running
 function startMinikube {
-	if ! minikube status > /dev/null 2>&1 ;then
-		echo "[INFO]Starting minikube"
-		# check for command dependencies
-		checkCommandInstalled minikube redis-cli jq envsubst psql
-		minikube start --driver docker --cpus max --memory max
-		minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
-		# give it a few seconds to settle down
-		sleep 10
-	fi
-	minikubeIP=$(minikube ip)
+  if which minikube > /dev/null 2>&1 ; then
+    if ! minikube status > /dev/null 2>&1 ;then
+      echo "[INFO]Starting minikube"
+      # check for command dependencies
+      checkCommandInstalled minikube redis-cli jq envsubst psql
+      minikube start --driver docker --cpus max --memory max
+      minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
+      # give it a few seconds to settle down
+      sleep 10
+    fi
+    IP=$(minikube ip)
+  else
+    IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
+  fi
 }
 
 function getPodName {
@@ -208,10 +212,10 @@ function getAdminUserKey {
 	typeset redisPort
 	typeset redisKey
 	redisPort=$(getControlRedisPort)
-	for redisKey in $(redis-cli -h $minikubeIP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
-		if [[ $(redis-cli -h $minikubeIP -p $redisPort type $redisKey) == 'string' ]]; then
-			if [[ "admin" == $(redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
-				redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.access_key 
+	for redisKey in $(redis-cli -h $IP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
+		if [[ $(redis-cli -h $IP -p $redisPort type $redisKey) == 'string' ]]; then
+			if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
+				redis-cli -h $IP -p $redisPort get $redisKey | jq -r .UserData.access_key 
 				return 0
 			fi
 		fi
@@ -222,10 +226,10 @@ function getOrgID {
 	typeset redisPort
 	typeset redisKey
 	redisPort=$(getControlRedisPort)
-	for redisKey in $(redis-cli -h $minikubeIP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
-		if [[ $(redis-cli -h $minikubeIP -p $redisPort type $redisKey) == 'string' ]]; then
-			if [[ "admin" == $(redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
-				redis-cli -h $minikubeIP -p $redisPort get $redisKey | jq -r .UserData.org_id
+	for redisKey in $(redis-cli -h $IP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
+		if [[ $(redis-cli -h $IP -p $redisPort type $redisKey) == 'string' ]]; then
+			if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
+				redis-cli -h $IP -p $redisPort get $redisKey | jq -r .UserData.org_id
 				return 0
 			fi
 		fi
@@ -265,16 +269,16 @@ function getControlGatewayPort {
 }
 
 function reportSanboxInfo {
-	echo "$NAMESPACE.dashboard:         http://$minikubeIP:$(getDashboardPort)/"
-	echo "$NAMESPACE.control-gateway:   http://$minikubeIP:$(getControlGatewayPort)/"
+	echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
+	echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
 	if [[ $DATABASE == 'mongo' ]]; then
 		checkMongoShellInstalled
-		echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $minikubeIP --port $(getMongoPort)"
+		echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $IP --port $(getMongoPort)"
 	fi
 	if [[ $DATABASE == 'postgres' ]]; then
-		echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$minikubeIP --port=$(getPostgresPort)"
+		echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$(getPostgresPort)"
 	fi
-	echo "$NAMESPACE.redis:             redis-cli -h $minikubeIP -p $(getControlRedisPort)"
+	echo "$NAMESPACE.redis:             redis-cli -h $IP -p $(getControlRedisPort)"
 	echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
 	echo "$NAMESPACE.OrgID:             $(getOrgID)"
 }
@@ -340,7 +344,7 @@ function OldapplyYAML {
 function licenseDashboard {
 	if [[ -n $SBX_LICENSE ]]; then
 		echo "[INFO]Licenseing the dashboard"
-		curl -s -d "license=$SBX_LICENSE" http://$minikubeIP:$(getDashboardPort)/license > /dev/null
+		curl -s -d "license=$SBX_LICENSE" http://$IP:$(getDashboardPort)/license > /dev/null
 	fi
 }
 
@@ -349,7 +353,7 @@ function addDashboardUser {
 		SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
 		# this bootstrap method is reliable for versions 2.9.x - 3.2.x (won't work on 2.8.x or earlier)
 		echo "[INFO]Adding admin account $SBX_USER"
-		curl -s -d "email_address=$SBX_USER&first_name=Tyk&last_name=Admin&password=$SBX_CLEAR_PASSWORD&confirm_password=$SBX_CLEAR_PASSWORD" http://$minikubeIP:$(getDashboardPort)/bootstrap > /dev/null
+		curl -s -d "email_address=$SBX_USER&first_name=Tyk&last_name=Admin&password=$SBX_CLEAR_PASSWORD&confirm_password=$SBX_CLEAR_PASSWORD" http://$IP:$(getDashboardPort)/bootstrap > /dev/null
 	fi
 }
 
@@ -464,12 +468,12 @@ function publishAPIs {
 		echo "[INFO]Publishing API $APIfile"
 		if grep -q api_definition "$APIfile"; then
 			# deal with the files that are a copy and paste of the API JSON from the dashboard
-			curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$minikubeIP:$DashboardPort/api/apis -d@"$APIfile" > /dev/null
+			curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d@"$APIfile" > /dev/null
 		else
 			# deal with the files that are exported APIs from the dashboard
 			APIfileName=$(mktemp /tmp/$(basename "$APIfile").XXXXXX)
 			createApiDefintion "$APIfile" > $APIfileName
-			curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$minikubeIP:$DashboardPort/api/apis -d@"$APIfileName" > /dev/null
+			curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d@"$APIfileName" > /dev/null
 			\rm $APIfileName
 		fi
 	done
@@ -477,7 +481,7 @@ function publishAPIs {
 
 # Process commands and take actions
 if [[ $# -gt 0 ]]; then
-	# make sure minikube is running and populate minikubeIP, the minikubeIP address it uses
+	# make sure minikube is running and populate IP, the IP address it uses
 	startMinikube
 	case $1 in 
 		create)
