@@ -87,7 +87,7 @@ data:
         "detailed_recording": true
       },
       "security": {
-        "audit_log_path": "/var/log/tyk-dashboard-security_audit.log"
+        "audit_log_path": "/dev/stdout"
       },
       "statsd_connection_string": "",
       "statsd_prefix": ""

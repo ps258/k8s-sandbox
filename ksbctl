@@ -65,6 +65,7 @@ YAMLDIR="$SCRIPTDIR/YAML"
 NAMESPACE_SELECTOR="purpose=support"
 NAMESPACE=''
 DATABASE=mongo
+TYK_TYPE=pro
 imageVersion=''
 KSBX_GATE_VERS=''
 KSBX_DASH_VERS=''
@@ -268,19 +269,28 @@ function getControlGatewayPort {
 	kubectl get svc -n $NAMESPACE control-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
+function getStandaloneGatewayPort {
+	kubectl get svc -n $NAMESPACE standalone-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
 function reportSanboxInfo {
-	echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
-	echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
-	if [[ $DATABASE == 'mongo' ]]; then
-		checkMongoShellInstalled
-		echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $IP --port $(getMongoPort)"
+	if [[ $TYK_TYPE == "pro" ]]; then
+		echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
+		echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
+		if [[ $DATABASE == 'mongo' ]]; then
+			checkMongoShellInstalled
+			echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $IP --port $(getMongoPort)"
+		fi
+		if [[ $DATABASE == 'postgres' ]]; then
+			echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$(getPostgresPort)"
+		fi
+		echo "$NAMESPACE.redis:             redis-cli -h $IP -p $(getControlRedisPort)"
+		echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
+		echo "$NAMESPACE.OrgID:             $(getOrgID)"
+	else
+		echo "$NAMESPACE.gateway:   http://$IP:$(getStandaloneGatewayPort)/"
+		echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getControlRedisPort)"
 	fi
-	if [[ $DATABASE == 'postgres' ]]; then
-		echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$(getPostgresPort)"
-	fi
-	echo "$NAMESPACE.redis:             redis-cli -h $IP -p $(getControlRedisPort)"
-	echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
-	echo "$NAMESPACE.OrgID:             $(getOrgID)"
 }
 
 function createNamespace {
@@ -301,8 +311,13 @@ function createNamespace {
 		if [[ -n $KSBX_MDCB_VERS ]]; then
 			kubectl label ns $NAMESPACE TYK_MDCB=$KSBX_MDCB_VERS
 		fi
-			kubectl label ns $NAMESPACE TYK_DATABASE=$DATABASE
+		kubectl label ns $NAMESPACE TYK_DATABASE=$DATABASE
 		echo "[INFO]Created namespace '$NAMESPACE'"
+		if [[ $TYK_TYPE == 'standalone' ]]; then
+			kubectl label ns $NAMESPACE TYK_TYPE=standalone
+		else
+			kubectl label ns $NAMESPACE TYK_TYPE=pro
+		fi
 	fi
 }
 
@@ -325,7 +340,7 @@ function applyYAML {
 	for YAMLfile in $*; do
 		YAMLfile=$(basename $YAMLfile)
 		if [[ -f $YAMLDIR/$YAMLfile ]]; then
-			cat $YAMLDIR/$YAMLfile | envsubst | tee -a /tmp/images | kubectl apply -n $NAMESPACE -f -
+			cat $YAMLDIR/$YAMLfile | envsubst | tee -a /tmp/yaml | kubectl apply -n $NAMESPACE -f -
 		fi
 	done
 }
@@ -374,6 +389,11 @@ function getDatabaseType {
 	DATABASE=$(kubectl get namespace $NAMESPACE -o json | jq -r .metadata.labels.TYK_DATABASE)
 }
 
+# is this a pro install or standalone
+function getInstallType {
+	TYK_TYPE=$(kubectl get namespace $NAMESPACE -o json | jq -r .metadata.labels.TYK_TYPE)
+}
+
 # report the tyk versions saved in the namespace Labels when it was created
 function showTykVersions {
 	typeset label
@@ -401,10 +421,13 @@ function loadVersions {
 	typeset version
 	line=$1
 	IFS=,
+	echo "[DEBUG]line=$line"
 	echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers
 	export KSBX_GATE_VERS="v${gwVers%%-*}"
-	export KSBX_DASH_VERS="v${dshbVers%%-*}"
-	export KSBX_PUMP_VERS="v${pumpVers%%-*}"
+	if [[ $TYK_TYPE == 'pro' ]]; then
+		export KSBX_DASH_VERS="v${dshbVers%%-*}"
+		export KSBX_PUMP_VERS="v${pumpVers%%-*}"
+	fi
 }
 
 function runShell {
@@ -489,10 +512,13 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts v:t:p arg; do
+			while getopts v:st:p arg; do
 				case $arg in
 					p)
 						DATABASE=postgres
+						;;
+					s)
+						TYK_TYPE=standalone
 						;;
 					t)
 						NAMESPACE=$(echo $OPTARG | sed 's/ /-/g')
@@ -515,54 +541,68 @@ if [[ $# -gt 0 ]]; then
 				help
 				exit 1
 			fi
-			if [[ $DATABASE == 'postgres' ]]; then
-				if ! echo $imageVersion | awk -F. '$1>3{exit 0} $1<4{exit 1}'; then
-					echo "[FATAL]Version must be 4 or later to use postgres"
-					exit 1
-				fi
-			fi
 			if ! namespaceExists $NAMESPACE; then
-				# export namespace for envsubst to pick up
 				KSBX_NS=$NAMESPACE
 				export KSBX_NS
-				if egrep -q "^$imageVersion," $VERSIONFILE; then
-					loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1)
-					echo "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
+				if [[ $TYK_TYPE == 'pro' ]]; then
+					if [[ $DATABASE == 'postgres' ]]; then
+						if ! echo $imageVersion | awk -F. '$1>3{exit 0} $1<4{exit 1}'; then
+							echo "[FATAL]Version must be 4 or later to use postgres"
+							exit 1
+						fi
+					fi
+					# export namespace for envsubst to pick up
+					if egrep -q "^$imageVersion," $VERSIONFILE; then
+						loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1)
+						echo "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
+					else
+						echo "[FATAL]Unable to find '$imageVersion' in '$VERSIONFILE'"
+						exit 1
+					fi
+					createNamespace
+					if [[ $DATABASE == 'mongo' ]]; then
+						echo "[INFO]Starting redis and mongo in the control plane"
+						applyYAML mongo.yaml control-redis.yaml # grpc-plugin.yaml
+						waitDeploymentReady control-redis
+						waitDeploymentReady mongo-db
+					elif [[ $DATABASE == 'postgres' ]]; then
+						echo "[INFO]Starting redis and postgres in the control plane"
+						applyYAML postgres.yaml control-redis.yaml # grpc-plugin.yaml
+						waitDeploymentReady control-redis
+						waitDeploymentReady postgres-db
+					fi
+					echo "[INFO]Starting dashboard, pump and gateway"
+					# setup configmaps first
+					applyYAML tyk-gateway-configmap-control.yaml
+					if [[ $DATABASE == 'mongo' ]]; then
+						applyYAML tyk-dashboard-configmap-mongo.yaml tyk-pump-configmap-mongo.yaml
+					elif [[ $DATABASE == 'postgres' ]]; then
+						applyYAML tyk-dashboard-configmap-postgres.yaml tyk-pump-configmap-postgres.yaml
+					fi
+					# create dashboard, control gateway and pump deployments
+					applyYAML tyk-dashboard.yaml tyk-gateway-control.yaml tyk-pump.yaml
+					# create dashboard and control gateway services
+					applyYAML tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
+					waitDeploymentReady tyk-dashboard
+					waitDeploymentReady control-gateway
+					licenseDashboard
+					addDashboardUser
+					publishAPIs $SCRIPTDIR/APIs/*.json
+					listPods
+					reportSanboxInfo 
 				else
-					echo "[FATAL]Unable to find '$imageVersion' in '$VERSIONFILE'"
-					exit 1
-				fi
-				createNamespace
-				if [[ $DATABASE == 'mongo' ]]; then
-					echo "[INFO]Starting redis and mongo in the control plane"
-					applyYAML mongo.yaml redis-control.yaml # grpc-plugin.yaml
+					# create standalone deployment of the gateway
+					loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
+					createNamespace
+					applyYAML control-redis.yaml
 					waitDeploymentReady control-redis
-					waitDeploymentReady mongo-db
-				elif [[ $DATABASE == 'postgres' ]]; then
-					echo "[INFO]Starting redis and postgres in the control plane"
-					applyYAML postgres.yaml redis-control.yaml # grpc-plugin.yaml
-					waitDeploymentReady control-redis
-					waitDeploymentReady postgres-db
+					applyYAML tyk-gateway-configmap-standalone.yaml
+					applyYAML tyk-gateway-standalone.yaml
+					applyYAML tyk-gateway-svc-standalone.yaml
+					waitDeploymentReady standalone-gateway
+					listPods
+					reportSanboxInfo 
 				fi
-				echo "[INFO]Starting dashboard, pump and gateway"
-				# setup configmaps first
-				applyYAML tyk-gateway-configmap-control.yaml
-				if [[ $DATABASE == 'mongo' ]]; then
-					applyYAML tyk-dashboard-configmap-mongo.yaml tyk-pump-configmap-mongo.yaml
-				elif [[ $DATABASE == 'postgres' ]]; then
-					applyYAML tyk-dashboard-configmap-postgres.yaml tyk-pump-configmap-postgres.yaml
-				fi
-				# create dashboard, control gateway and pump deployments
-				applyYAML tyk-dashboard.yaml tyk-gateway-control.yaml tyk-pump.yaml
-				# create dashboard and control gateway services
-				applyYAML tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
-				waitDeploymentReady tyk-dashboard
-				waitDeploymentReady control-gateway
-				licenseDashboard
-				addDashboardUser
-				publishAPIs $SCRIPTDIR/APIs/*.json
-				listPods
-				reportSanboxInfo 
 			else
 				echo "[FATAL]Namespace '$NAMESPACE' already exists"
 				exit 1
@@ -625,6 +665,8 @@ if [[ $# -gt 0 ]]; then
 				if namespaceExists $NAMESPACE; then
 					# set DATABASE for this namespace
 					getDatabaseType
+					# find if it's a pro or standalone install
+					getInstallType
 					echo "[INFO]$NAMESPACE"
 					showTykVersions
 					listPods
