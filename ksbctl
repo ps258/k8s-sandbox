@@ -91,9 +91,10 @@ function help {
 	typeset name
 	name=$(basename $SCRIPTNAME)
 	echo "[USAGE]:"
-	echo "$name create -v <tyk version> -t <namespace> -p"
+	echo "$name create -v <tyk version> -t <namespace> [-p|-s]"
 	echo "      Create a tyk instance the name space given as a tag"
 	echo "      -p deploy with postgres not mongo"
+	echo "      -s deploy a stand alone gateway"
 	echo "$name delete <namespace>"
 	echo "      Delete the namespace given as a tag and all resources in it"
 	echo "$name list"
