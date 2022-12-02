@@ -42,7 +42,7 @@ SCRIPTDIR=$(
 )
 VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
 YAMLDIR="$SCRIPTDIR/YAML"
-NAMESPACE_SELECTOR="purpose=support"
+NAMESPACE_SELECTOR="creator=ksbctl"
 NAMESPACE=''
 KSBX_DESCRIPTION='N/A'
 KSBX_DATABASE=mongo
@@ -96,7 +96,7 @@ function nextFreeNamespace {
 	typeset i
 	existing=$(kubectl get namespaces --selector=$NAMESPACE_SELECTOR --no-headers=true | awk '{print $1}')
 	for i in $(seq 1 1000); do
-		test="sandbox-$i"
+		test="ksandbox-$i"
 		if ! echo $existing | grep -qw $test; then
 			echo $i
 			break
@@ -334,6 +334,7 @@ function createNamespace {
 		kubectl apply -f $configYAML -n $NAMESPACE
 		echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
+	rm -f $configYAML
 }
 
 function namespaceExists {
@@ -577,8 +578,8 @@ if [[ $# -gt 0 ]]; then
 						;;
 				esac
 			done
-			NAMESPACE=sandbox-$(nextFreeNamespace)
-			if [[ -z $NAMESPACE || -z $sandboxVersion ]]; then
+			NAMESPACE=ksandbox-$(nextFreeNamespace)
+			if [[ -z $KSBX_DESCRIPTION || -z $sandboxVersion ]]; then
 				echo "[FATAL]Both -v and -t must be set"
 				help
 				exit 1
