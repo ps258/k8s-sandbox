@@ -19,40 +19,20 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #  				-D /tmp 1777 root root -
 #					+d /tmp 1777 root root 1s
 #					+x /tmp/hostpath-provisioner/*
-#			(done) Redis
-#		(done) be able to set the version used
-#			(done) create index of versions that can be used
-#			(done) use envsubst to create sandboxes of different versions
-#			(done) Save versions in label and display them in the info/list commands
 #			Set versions for mdcb, mongo/redis and postgresql too
 #			Allow commandline override of versions of all components
-#		(done) test for command dependencies
-#			(done) minikube
-#				(done) allow creation of cluster if not present
-#			(done) envsubst mongo shell redis-cli
 #		test on other platforms
 #			windows
-#			MacOS
+#			(done) MacOS
 #				M1
-#		(done) Better checking of pod startup.
-#			(done) Warn if pods in 'Pending' and exit
-#		(done) expose redis and mongo ports
-#		(done) retrieve credentials from redis
-#			(done) display admin creds when asked
-#			(done) autoload APIs
 #		deploy with MDCB
-#		(done) deploy with postgresql
 #		create way to deploy plugins
 #			bundle server
 #			golang
 #     share plugin folders with sbctl
 #			python/lua
 #		Convenience commands
-#			(done) logs
-#			(done) shell
 #			performance stats
-#			(done) publish APIs
-#			(done) shell into the container running the cluster
 
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
@@ -66,7 +46,7 @@ NAMESPACE_SELECTOR="purpose=support"
 NAMESPACE=''
 DATABASE=mongo
 TYK_TYPE=pro
-imageVersion=''
+sandboxVersion=''
 KSBX_GATE_VERS=''
 KSBX_DASH_VERS=''
 KSBX_PUMP_VERS=''
@@ -139,21 +119,21 @@ function checkMongoShellInstalled {
 
 # create or start minikube if it's not already running
 function startMinikube {
-  if which minikube > /dev/null 2>&1 ; then
+	if which minikube > /dev/null 2>&1 ; then
 		alias kubectl="minikube kubectl -- "
-    if ! minikube status > /dev/null 2>&1 ;then
-      echo "[INFO]Starting minikube"
-      # check for command dependencies
-      checkCommandInstalled redis-cli jq envsubst psql
-      minikube start --driver docker --cpus max --memory max
-      minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
-      # give it a few seconds to settle down
-      sleep 10
-    fi
-    IP=$(minikube ip)
-  else
-    IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
-  fi
+		if ! minikube status > /dev/null 2>&1 ;then
+			echo "[INFO]Starting minikube"
+			# check for command dependencies
+			checkCommandInstalled redis-cli jq envsubst psql
+			minikube start --driver docker --cpus max --memory max
+			minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
+			# give it a few seconds to settle down
+			sleep 10
+		fi
+		IP=$(minikube ip)
+	else
+		IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
+	fi
 }
 
 function getPodName {
@@ -295,30 +275,37 @@ function reportSanboxInfo {
 }
 
 function createNamespace {
+	typeset tyk_db; typeset tyk_gw; typeset tyk_pmp; typeset tyk_mdcb; typeset tyk_type; typeset tyk_version
+	tyk_db=''; tyk_gw=''; tyk_pmp=''; tyk_mdcb=''; tyk_type=''; tyk_version=''
 	if ! namespaceExists $NAMESPACE; then
 		echo "[INFO]kubectl create ns $NAMESPACE"
 		kubectl create ns $NAMESPACE
 		echo "[INFO]kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR"
 		kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR
+		# setup config map in the new namespace with the details of the deployment
+		if [[ -n $sandboxVersion ]]; then
+			tyk_version="--from-literal=TYK_VERSION=$sandboxVersion"
+		fi
 		if [[ -n $KSBX_GATE_VERS ]]; then
-			kubectl label ns $NAMESPACE TYK_GW=$KSBX_GATE_VERS
+			tyk_gw="--from-literal=TYK_GW=$KSBX_GATE_VERS"
 		fi
 		if [[ -n $KSBX_DASH_VERS ]]; then
-			kubectl label ns $NAMESPACE TYK_DB=$KSBX_DASH_VERS
+			tyk_db="--from-literal=TYK_DB=$KSBX_DASH_VERS"
 		fi
 		if [[ -n $KSBX_PUMP_VERS ]]; then
-			kubectl label ns $NAMESPACE TYK_PMP=$KSBX_PUMP_VERS
+			tyk_pmp="--from-literal=TYK_PMP=$KSBX_PUMP_VERS"
 		fi
 		if [[ -n $KSBX_MDCB_VERS ]]; then
-			kubectl label ns $NAMESPACE TYK_MDCB=$KSBX_MDCB_VERS
+			tyk_mdcb="--from-literal=TYK_MDCB=$KSBX_MDCB_VERS"
 		fi
-		kubectl label ns $NAMESPACE TYK_DATABASE=$DATABASE
-		echo "[INFO]Created namespace '$NAMESPACE'"
 		if [[ $TYK_TYPE == 'standalone' ]]; then
-			kubectl label ns $NAMESPACE TYK_TYPE=standalone
+			tyk_type="--from-literal=TYK_TYPE=standalone"
 		else
-			kubectl label ns $NAMESPACE TYK_TYPE=pro
+			tyk_type="--from-literal=TYK_TYPE=pro"
 		fi
+		kubectl create configmap sandbox-details $tyk_db $tyk_gw $tyk_pmp $tyk_mdcb $tyk_type \
+			--from-literal=TYK_DATABASE=$DATABASE -n $NAMESPACE
+					echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
 }
 
@@ -387,24 +374,26 @@ function listPods {
 }
 
 function getDatabaseType {
-	DATABASE=$(kubectl get namespace $NAMESPACE -o json | jq -r .metadata.labels.TYK_DATABASE)
+	DATABASE=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.TYK_DATABASE)
 }
 
 # is this a pro install or standalone
 function getInstallType {
-	TYK_TYPE=$(kubectl get namespace $NAMESPACE -o json | jq -r .metadata.labels.TYK_TYPE)
+	DATABASE=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.TYK_TYPE)
 }
 
-# report the tyk versions saved in the namespace Labels when it was created
+# report the tyk versions saved in the namespace configmap sandbox-details when it was created
 function showTykVersions {
-	typeset label
+	typeset key
 	typeset value
 	typeset report
+	typeset sandboxDetails
+	sandboxDetails=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data)
 	report=''
-	for label in TYK_DB TYK_GW TYK_PMP TYK_MDCB; do
-		value=$(kubectl get namespace -L $label $NAMESPACE -o json | jq -r .metadata.labels.$label)
+	for key in TYK_VERSION TYK_TYPE TYK_DB TYK_GW TYK_PMP TYK_MDCB TYK_DATABASE; do
+		value=$(echo $sandboxDetails | jq -r .$key)
 		if [[ $value != 'null' ]]; then
-			report="$report $label=$value"
+			report="$report $key=$value"
 		fi
 	done
 	echo $report
@@ -422,7 +411,6 @@ function loadVersions {
 	typeset version
 	line=$1
 	IFS=,
-	echo "[DEBUG]line=$line"
 	echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers
 	export KSBX_GATE_VERS="v${gwVers%%-*}"
 	if [[ $TYK_TYPE == 'pro' ]]; then
@@ -473,37 +461,65 @@ function tidyPVCs {
 }
 
 function createApiDefintion {
-  # converts API definition format from the one given using 'export' on the dashboard to the one expected when importing via /api/apis
-  typeset APIfile
-  APIfile="$1"
-  echo '  {'
-  echo '    "api_model": {},'
-  echo '    "api_definition":' $(<"$APIfile") ','
-  echo '    "hook_references": [],'
-  echo '    "is_site": false,'
-  echo '    "sort_by": 0'
-  echo '}'
+	# converts API definition format from the one given using 'export' on the dashboard to the one expected when importing via /api/apis
+	typeset APIfile
+	APIfile="$1"
+	echo '  {'
+	echo '    "api_model": {},'
+	echo '    "api_definition":' $(<"$APIfile") ','
+	echo '    "hook_references": [],'
+	echo '    "is_site": false,'
+	echo '    "sort_by": 0'
+	echo '}'
 }
 
 function publishAPIs {
 	typeset APIfile
-	typeset adminKey
-	typeset DashboardPort
-	adminKey=$(getAdminUserKey)
-	DashboardPort=$(getDashboardPort)
-	for APIfile in "$@"; do
-		echo "[INFO]Publishing API $APIfile"
-		if grep -q api_definition "$APIfile"; then
-			# deal with the files that are a copy and paste of the API JSON from the dashboard
-			curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d@"$APIfile" > /dev/null
-		else
-			# deal with the files that are exported APIs from the dashboard
-			APIfileName=$(mktemp /tmp/$(basename "$APIfile").XXXXXX)
-			createApiDefintion "$APIfile" > $APIfileName
-			curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d@"$APIfileName" > /dev/null
-			\rm $APIfileName
-		fi
+	if [[ $TYK_TYPE == 'pro' ]]; then
+		typeset adminKey
+		typeset DashboardPort
+		adminKey=$(getAdminUserKey)
+		DashboardPort=$(getDashboardPort)
+		for APIfile in "$@"; do
+			echo "[INFO]Publishing API $APIfile"
+			if grep -q api_definition "$APIfile"; then
+				# deal with the files that are a copy and paste of the API JSON from the dashboard
+				curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d@"$APIfile" > /dev/null
+			else
+				# deal with the files that are exported APIs from the dashboard
+				APIfileName=$(mktemp /tmp/$(basename "$APIfile").XXXXXX)
+				createApiDefintion "$APIfile" > $APIfileName
+				curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d@"$APIfileName" > /dev/null
+				\rm $APIfileName
+			fi
+		done
+	else
+		# stand alone
+		typeset gatewaySecret
+		typeset gatewayPort
+		typeset APIs
+		typeset API
+		set -x
+		gatewaySecret=Secret
+		gatewayPort=$(getStandaloneGatewayPort)
+		APIs=""
+		API=""
+		# load the APIs
+		for APIfile in "$@"; do
+			curl -sH "x-tyk-authorization: $gatewaySecret" -d @$APIfile http://$IP:$gatewayPort/tyk/apis
+		done
+		# hot reload the gateway
+		sleep 10
+		curl -sH "x-tyk-authorization: $gatewaySecret" http://$IP:$gatewayPort/tyk/reload/group
+		# report on APIs reloaded
+		sleep 10
+		curl -sH "x-tyk-authorization: $gatewaySecret" http://$IP:$gatewayPort/tyk/apis | jq -r '.[].name' | while read API; do
+		APIs="$API $APIs"
 	done
+	if [[ -n $APIs ]]; then
+		echo "[INFO]Apis published: $APIs"
+	fi
+	fi
 }
 
 # Process commands and take actions
@@ -525,7 +541,7 @@ if [[ $# -gt 0 ]]; then
 						NAMESPACE=$(echo $OPTARG | sed 's/ /-/g')
 						;;
 					v)
-						imageVersion=$OPTARG
+						sandboxVersion=$OPTARG
 						;;
 					:)
 						echo "[FATAL]Option -$OPTARG requires an arguement."
@@ -537,7 +553,7 @@ if [[ $# -gt 0 ]]; then
 						;;
 				esac
 			done
-			if [[ -z $NAMESPACE || -z $imageVersion ]]; then
+			if [[ -z $NAMESPACE || -z $sandboxVersion ]]; then
 				echo "[FATAL]Both -v and -t must be set"
 				help
 				exit 1
@@ -547,17 +563,17 @@ if [[ $# -gt 0 ]]; then
 				export KSBX_NS
 				if [[ $TYK_TYPE == 'pro' ]]; then
 					if [[ $DATABASE == 'postgres' ]]; then
-						if ! echo $imageVersion | awk -F. '$1>3{exit 0} $1<4{exit 1}'; then
+						if ! echo $sandboxVersion | awk -F. '$1>3{exit 0} $1<4{exit 1}'; then
 							echo "[FATAL]Version must be 4 or later to use postgres"
 							exit 1
 						fi
 					fi
 					# export namespace for envsubst to pick up
-					if egrep -q "^$imageVersion," $VERSIONFILE; then
-						loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1)
+					if egrep -q "^$sandboxVersion," $VERSIONFILE; then
+						loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1)
 						echo "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
 					else
-						echo "[FATAL]Unable to find '$imageVersion' in '$VERSIONFILE'"
+						echo "[FATAL]Unable to find '$sandboxVersion' in '$VERSIONFILE'"
 						exit 1
 					fi
 					createNamespace
@@ -592,8 +608,8 @@ if [[ $# -gt 0 ]]; then
 					listPods
 					reportSanboxInfo 
 				else
-					# create standalone deployment of the gateway
-					loadVersions $(grep -e "^$imageVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
+					# create standalone (CE) deployment of the gateway
+					loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
 					createNamespace
 					applyYAML control-redis.yaml
 					waitDeploymentReady control-redis
@@ -601,6 +617,7 @@ if [[ $# -gt 0 ]]; then
 					applyYAML tyk-gateway-standalone.yaml
 					applyYAML tyk-gateway-svc-standalone.yaml
 					waitDeploymentReady standalone-gateway
+					publishAPIs $SCRIPTDIR/APIs/*.json
 					listPods
 					reportSanboxInfo 
 				fi
@@ -615,8 +632,8 @@ if [[ $# -gt 0 ]]; then
 				echo "[FATAL]Must provide namespace"
 				exit 1
 			fi
-			echo "[INFO]kubectl delete namespace $*"
-			kubectl delete namespace $*
+			echo "[INFO]kubectl delete namespace $*" 
+			kubectl delete namespace $* --wait
 			tidyPVCs
 			;;
 		help)
@@ -629,11 +646,11 @@ if [[ $# -gt 0 ]]; then
 			;;
 		log*)
 			shift
-      if [[ $# -lt 1 ]]; then
-        echo "[FATAL]Must provide namespace"
-        exit 1
-      fi
-      NAMESPACE=$1
+			if [[ $# -lt 1 ]]; then
+				echo "[FATAL]Must provide namespace"
+				exit 1
+			fi
+			NAMESPACE=$1
 			shift
 			showLogs $1
 			;;
@@ -649,9 +666,9 @@ if [[ $# -gt 0 ]]; then
 		publish)
 			shift
 			if [[ $# -lt 1 ]]; then
-        echo "[FATAL]Must provide namespace"
-        exit 1
-      fi
+				echo "[FATAL]Must provide namespace"
+				exit 1
+			fi
 			NAMESPACE=$1
 			shift
 			publishAPIs "$@"
