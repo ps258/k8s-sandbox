@@ -55,8 +55,9 @@ KSBX_MDCB_VERS=''
 KSBX_NS=''
 MONGOSHELL=''
 export KSBX_PGPASSWORD=password		# default postgres password
-export KSBX_PGUSER=postgresx				# default postgres username
+export KSBX_PGUSER=postgresx			# default postgres username
 export KSBX_PGDB=tyk_analytics		# default postgres database
+export KSBX_GATEWAY_REPLICAS=1		# default number of gateways to run
 
 # load env variables
 ENVFILE=~/.tyk-sandbox
@@ -72,10 +73,12 @@ function help {
 	typeset name
 	name=$(basename $SCRIPTNAME)
 	echo "[USAGE]:"
-	echo "$name create -v <tyk version> -t <namespace> [-p|-s]"
-	echo "      Create a tyk instance the name space given as a tag"
+	echo "$name create -v <tyk version> -t <namespace description> [-p|-s] [-c gateway_count]"
+	echo "      Create a tyk instance the name space given as a tag with -v"
+	echo "      -c the number of gateway replicas to run"
 	echo "      -p deploy with postgres not mongo"
 	echo "      -s deploy a stand alone gateway"
+	echo "      -t description of the namespace"
 	echo "$name delete <namespace>"
 	echo "      Delete the namespace given as a tag and all resources in it"
 	echo "$name list"
@@ -554,8 +557,11 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts v:st:p arg; do
+			while getopts c:v:st:p arg; do
 				case $arg in
+					c)
+						KSBX_GATEWAY_REPLICAS=$OPTARG
+						;;
 					p)
 						KSBX_DATABASE=postgres
 						;;
