@@ -165,7 +165,7 @@ function waitDeploymentReady {
 	if [[ -n $deploymentName ]]; then
 		if kubectl get deployment --no-headers=true -n $NAMESPACE $deploymentName > /dev/null 2>&1; then
 			echo -n "[INFO]Waiting for deployment $NAMESPACE:$deploymentName to be ready."
-			while [[ $( kubectl get deployment --no-headers=true -n $NAMESPACE $deploymentName | awk -F '[ /]+' 'BEGIN{allup=0} {up=$2 - $3i; if (up != 0) {allup=up}}; END{print allup}' ) -ne 0 ]]; do
+			while [[ $( kubectl get deployment --no-headers=true -n $NAMESPACE $deploymentName | awk -F '[ /]+' 'BEGIN{allup=0} {up=$2 - $3; if (up != 0) {allup=up}}; END{print allup}' ) -ne 0 ]]; do
 				echo -n .
 				sleep 5
 			done
