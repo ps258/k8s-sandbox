@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-gateway
+  labels:
+    app: tyk-gateway
+    plane: edge
+spec:
+  replicas: $KSBX_EDGE_GATEWAY_REPLICAS
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: tyk-gateway
+      plane: edge
+  template:
+    metadata:
+      labels:
+        app: tyk-gateway
+        plane: edge
+      annotations:
+    spec:
+      containers:
+      - image: tykio/tyk-gateway:$KSBX_GATE_VERS
+        imagePullPolicy: IfNotPresent
+        name: tyk-gateway
+        securityContext:
+          runAsNonRoot: false
+          allowPrivilegeEscalation: true
+          privileged: true
+        env:
+          - name: TYK_LOGLEVEL
+            value: "debug"
+        command: ["/opt/tyk-gateway/tyk", "--conf=/etc/tyk-gateway/tyk_gateway.conf"]
+        workingDir: /opt/tyk-gateway
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+          - name: tyk-gateway-conf
+            mountPath: /etc/tyk-gateway
+        livenessProbe:
+          httpGet:
+            scheme: "HTTP"
+            path: /hello
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        readinessProbe:
+          httpGet:
+            scheme: "HTTP"
+            path: /hello
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+        - name: tyk-gateway-conf
+          configMap:
+            name: tyk-gateway-conf-edge
+            items:
+              - key: tyk_gateway.conf
+                path: tyk_gateway.conf
