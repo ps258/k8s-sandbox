@@ -89,15 +89,15 @@ function help {
 	echo "$name delete <namespace>"
 	echo "      Delete the namespace given as a tag and all resources in it"
 	echo "$name list"
-	echo "      List all namespaces"
+	echo "      List all sandboxes"
 	echo "$name logs <namespace> <podname>"
 	echo "      Tail the logs of the named pod"
 	echo "$name info <namespace>"
 	echo "      Print info on the particular instance"
-	echo "$name shell <namespace> <pod>"
+	echo "$name shell <namespace> <podname>"
 	echo "      Start an interactive shell in the pod."
 	echo "      The pod name can be a substring of the actual name"
-	echo "      eg. $name shell ns1 dashboard"
+	echo "      eg. $name shell ksandbox-1 dashboard"
 }
 
 # find the next namespace index that's unused
