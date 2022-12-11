@@ -305,7 +305,7 @@ function reportSanboxInfo {
 			echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $(getControlRedisPort)"
 			echo "$NAMESPACE.edge-redis:        redis-cli -h $IP -p $(getEdgeRedisPort)"
 		else
-			echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getControlRedisPort)"
+			echo "$NAMESPACE.redis:             redis-cli -h $IP -p $(getControlRedisPort)"
 		fi
 		echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
 		echo "$NAMESPACE.OrgID:             $(getOrgID)"
