@@ -6,7 +6,7 @@ metadata:
     app: tyk-gateway
     plane: control
 spec:
-  replicas: $KSBX_GATEWAY_REPLICAS
+  replicas: $KSBX_CONTROL_GATEWAY_REPLICAS
   minReadySeconds: 5
   strategy:
     type: RollingUpdate

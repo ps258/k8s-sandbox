@@ -15,7 +15,7 @@ data:
       },
       "mongo_url": "mongodb://mongo-db/tyk_analytics",
       "page_size": 10,
-      "admin_secret": "admin_secret",
+      "admin_secret": "$KSBX_ADMIN_SECRET",
       "shared_node_secret": "shared_node_secret",
       "redis_port": 6379,
       "redis_host": "control-redis",

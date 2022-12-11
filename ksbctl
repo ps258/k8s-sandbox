@@ -47,17 +47,21 @@ NAMESPACE=''
 KSBX_DESCRIPTION='N/A'
 KSBX_DATABASE=mongo
 KSBX_TYPE=pro
+INSTALL_EDGE=false
 sandboxVersion=''
 KSBX_GATE_VERS=''
 KSBX_DASH_VERS=''
 KSBX_PUMP_VERS=''
 KSBX_MDCB_VERS=''
+KSBX_MDCB_LICENSE=''
 KSBX_NS=''
 MONGOSHELL=''
+export KSBX_ADMIN_SECRET=admin_secret
 export KSBX_PGPASSWORD=password		# default postgres password
 export KSBX_PGUSER=postgresx			# default postgres username
 export KSBX_PGDB=tyk_analytics		# default postgres database
-export KSBX_GATEWAY_REPLICAS=1		# default number of gateways to run
+export KSBX_CONTROL_GATEWAY_REPLICAS=1		# default number of control gateways to run
+export KSBX_EDGE_GATEWAY_REPLICAS=1		# default number of edge gateways to run
 
 # load env variables
 ENVFILE=~/.tyk-sandbox
@@ -65,6 +69,7 @@ if [[ -f $ENVFILE ]]; then
 	. $ENVFILE
 else
 	SBX_LICENSE=""
+	SBX_MDCB_LICENSE=""
 	SBX_USER=""
 	SBX_PASSWORD=""
 fi
@@ -97,7 +102,7 @@ function help {
 function nextFreeNamespace {
 	typeset existing
 	typeset i
-	existing=$(kubectl get namespaces --selector=$NAMESPACE_SELECTOR --no-headers=true | awk '{print $1}')
+	existing=$(kubectl get namespaces --selector=$NAMESPACE_SELECTOR --no-headers=true 2>/dev/null | awk '{print $1}')
 	for i in $(seq 1 1000); do
 		test="ksandbox-$i"
 		if ! echo $existing | grep -qw $test; then
@@ -271,6 +276,9 @@ function getEdgeGatewayPort {
 function getControlGatewayPort {
 	kubectl get svc -n $NAMESPACE control-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
+function getEdgeGatewayPort {
+	kubectl get svc -n $NAMESPACE edge-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
 
 function getStandaloneGatewayPort {
 	kubectl get svc -n $NAMESPACE standalone-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
@@ -278,9 +286,12 @@ function getStandaloneGatewayPort {
 
 function reportSanboxInfo {
 	echo "$NAMESPACE.Description:       $(getDescription)"
-	if [[ $KSBX_TYPE == "pro" ]]; then
+	if [[ $KSBX_TYPE == 'pro'  || $KSBX_TYPE == 'mdcb' ]]; then
 		echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
 		echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
+		if [[ $KSBX_TYPE == "mdcb" ]]; then
+			echo "$NAMESPACE.edge-gateway:      http://$IP:$(getEdgeGatewayPort)/"
+		fi
 		if [[ $KSBX_DATABASE == 'mongo' ]]; then
 			checkMongoShellInstalled
 			echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $IP --port $(getMongoPort)"
@@ -288,7 +299,12 @@ function reportSanboxInfo {
 		if [[ $KSBX_DATABASE == 'postgres' ]]; then
 			echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$(getPostgresPort)"
 		fi
-		echo "$NAMESPACE.redis:             redis-cli -h $IP -p $(getControlRedisPort)"
+		if [[ $KSBX_TYPE == "mdcb" ]]; then
+			echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $(getControlRedisPort)"
+			echo "$NAMESPACE.edge-redis:        redis-cli -h $IP -p $(getEdgeRedisPort)"
+		else
+			echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getControlRedisPort)"
+		fi
 		echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
 		echo "$NAMESPACE.OrgID:             $(getOrgID)"
 	else
@@ -323,11 +339,7 @@ function createNamespace {
 		if [[ -n $KSBX_MDCB_VERS ]]; then
 			echo "  KSBX_MDCB: $KSBX_MDCB_VERS" >> $configYAML
 		fi
-		if [[ $KSBX_TYPE == 'standalone' ]]; then
-			echo "  KSBX_TYPE: standalone" >> $configYAML
-		else
-			echo "  KSBX_TYPE: pro" >> $configYAML
-		fi
+		echo "  KSBX_TYPE: $KSBX_TYPE" >> $configYAML
 		echo "  KSBX_DATABASE: $KSBX_DATABASE" >> $configYAML
 		echo "  KSBX_DESCRIPTION: $KSBX_DESCRIPTION" >> $configYAML
 		echo "kind: ConfigMap" >> $configYAML
@@ -359,6 +371,7 @@ function applyYAML {
 	for YAMLfile in $*; do
 		YAMLfile=$(basename $YAMLfile)
 		if [[ -f $YAMLDIR/$YAMLfile ]]; then
+			#echo "[DEBUG]Applying YAML file $YAMLfile" | tee -a /tmp/yaml
 			cat $YAMLDIR/$YAMLfile | envsubst | tee -a /tmp/yaml | kubectl apply -n $NAMESPACE -f -
 		fi
 	done
@@ -436,14 +449,18 @@ function loadVersions {
 	typeset pumpVers
 	typeset TIBvers
 	typeset syncVers
+	typeset MDCBvers
 	typeset version
 	line=$1
 	IFS=,
-	echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers
+	echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers MDCBvers
 	export KSBX_GATE_VERS="v${gwVers%%-*}"
-	if [[ $KSBX_TYPE == 'pro' ]]; then
+	if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
 		export KSBX_DASH_VERS="v${dshbVers%%-*}"
 		export KSBX_PUMP_VERS="v${pumpVers%%-*}"
+		if [[ $KSBX_TYPE == 'mdcb' ]]; then
+			export KSBX_MDCB_VERS="v${MDCBvers%%-*}"
+		fi
 	fi
 }
 
@@ -478,6 +495,18 @@ function showLogs {
 	kubectl logs -n $NAMESPACE $pod -f
 }
 
+function enableHybrid {
+	typeset orgID
+	typeset adminSecret
+	typeset dashboardPort
+	typeset orgJSON
+	dashboardPort=$(getDashboardPort)
+	orgID=$1
+	echo "[INFO]Enabling hybrid on org_id $orgID"
+	orgJSON=$(curl -s http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" | jq ".hybrid_enabled = true")
+	curl -sX PUT http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" -d "$orgJSON"
+}
+
 # Sometimes PersistentVolumeClaim are left when the namespace is deleted.
 # Tidy up any in state 'Released'
 function tidyPVCs {
@@ -503,7 +532,7 @@ function createApiDefintion {
 
 function publishAPIs {
 	typeset APIfile
-	if [[ $KSBX_TYPE == 'pro' ]]; then
+	if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
 		typeset adminKey
 		typeset DashboardPort
 		adminKey=$(getAdminUserKey)
@@ -527,7 +556,6 @@ function publishAPIs {
 		typeset gatewayPort
 		typeset APIs
 		typeset API
-		set -x
 		gatewaySecret=Secret
 		gatewayPort=$(getStandaloneGatewayPort)
 		APIs=""
@@ -557,10 +585,22 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts c:v:st:p arg; do
+			while getopts c:e:mp:st:v: arg; do
 				case $arg in
 					c)
-						KSBX_GATEWAY_REPLICAS=$OPTARG
+						KSBX_CONTROL_GATEWAY_REPLICAS=$OPTARG
+						;;
+					e)
+						KSBX_EDGE_GATEWAY_REPLICAS=$OPTARG
+						;;
+					m)
+						INSTALL_EDGE=true
+						if [[ -z $SBX_MDCB_LICENSE ]]; then
+							echo "[FATAl]No MDCB license present in ~/.tyk-sandbox. Please populate with SBX_MDCB_LICENSE=<MDCB LICENSE KEY>"
+							exit 1
+						else
+							export KSBX_MDCB_LICENSE=$SBX_MDCB_LICENSE
+						fi
 						;;
 					p)
 						KSBX_DATABASE=postgres
@@ -590,10 +630,17 @@ if [[ $# -gt 0 ]]; then
 				help
 				exit 1
 			fi
+			if [[ $KSBX_TYPE == 'standalone' && $INSTALL_EDGE == 'true' ]]; then
+				echo "[FATAL]Use -m or -s. Cannot install MDCB with standalone deployment."
+				exit 1
+			fi
+			if [[ $INSTALL_EDGE == 'true' ]]; then
+				KSBX_TYPE=mdcb
+			fi
 			if ! namespaceExists $NAMESPACE; then
 				KSBX_NS=$NAMESPACE
 				export KSBX_NS
-				if [[ $KSBX_TYPE == 'pro' ]]; then
+				if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
 					if [[ $KSBX_DATABASE == 'postgres' ]]; then
 						if ! echo $sandboxVersion | awk -F. '$1>3{exit 0} $1<4{exit 1}'; then
 							echo "[FATAL]Version must be 4 or later to use postgres"
@@ -603,7 +650,12 @@ if [[ $# -gt 0 ]]; then
 					# export namespace for envsubst to pick up
 					if egrep -q "^$sandboxVersion," $VERSIONFILE; then
 						loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1)
-						echo "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
+						echo -n "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
+						if [[ -n $KSBX_MDCB_VERS ]]; then
+							echo ", MDCB $KSBX_MDCB_VERS"
+						else
+							echo 
+						fi
 					else
 						echo "[FATAL]Unable to find '$sandboxVersion' in '$VERSIONFILE'"
 						exit 1
@@ -636,6 +688,20 @@ if [[ $# -gt 0 ]]; then
 					waitDeploymentReady control-gateway
 					licenseDashboard
 					addDashboardUser
+					if [[ $KSBX_TYPE == 'mdcb' ]]; then
+						# add edge redis and edge gateways
+						export KSBX_ADMIN_API_KEY=$(getAdminUserKey)
+						export KSBX_ORG_ID=$(getOrgID)
+						enableHybrid $KSBX_ORG_ID $KSBX_ADMIN_API_KEY
+						applyYAML tyk-mdcb-configmap-mongo.yaml edge-redis.yaml tyk-gateway-configmap-edge.yaml
+						waitDeploymentReady edge-redis
+						applyYAML tyk-mdcb.yaml
+						waitDeploymentReady tyk-sink
+						# deploy edge gateways
+						applyYAML tyk-gateway-edge.yaml
+						waitDeploymentReady edge-gateway
+						applyYAML tyk-gateway-svc-edge.yaml
+					fi
 					publishAPIs $SCRIPTDIR/APIs/*.json
 					listPods
 					reportSanboxInfo 
