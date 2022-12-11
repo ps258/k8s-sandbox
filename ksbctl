@@ -25,7 +25,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			windows
 #			(done) MacOS
 #				M1
-#		deploy with MDCB
+#		(done) deploy with MDCB
 #		create way to deploy plugins
 #			bundle server
 #			golang
@@ -379,19 +379,6 @@ function applyYAML {
 	done
 }
 
-function OldapplyYAML {
-	typeset YAML
-	typeset YAMLfile
-	YAML=""
-	for YAMLfile in $*; do
-		YAMLfile=$(basename $YAMLfile)
-		if [[ -f $YAMLDIR/$YAMLfile ]]; then
-			YAML="$YAML -f $YAMLDIR/$YAMLfile"
-		fi
-	done
-	kubectl apply -n $NAMESPACE $YAML
-}
-
 function licenseDashboard {
 	if [[ -n $SBX_LICENSE ]]; then
 		echo "[INFO]Licenseing the dashboard"
@@ -590,12 +577,17 @@ if [[ $# -gt 0 ]]; then
 			while getopts c:e:mp:st:v: arg; do
 				case $arg in
 					c)
+						# the number of control gateways to deploy (these are also just gateways in the pro install)
+						# defaults to one
 						KSBX_CONTROL_GATEWAY_REPLICAS=$OPTARG
 						;;
 					e)
+						# the number of edge gateways to deploy (must be combined with -m to deploy MDCB)
+						# defaults to one
 						KSBX_EDGE_GATEWAY_REPLICAS=$OPTARG
 						;;
 					m)
+						# deploy with MDCB, edge redis and edge gateways
 						INSTALL_EDGE=true
 						if [[ -z $SBX_MDCB_LICENSE ]]; then
 							echo "[FATAl]No MDCB license present in ~/.tyk-sandbox. Please populate with SBX_MDCB_LICENSE=<MDCB LICENSE KEY>"
@@ -605,15 +597,20 @@ if [[ $# -gt 0 ]]; then
 						fi
 						;;
 					p)
+						# use postgresql not mongodb
+						# defaults to mongo without this
 						KSBX_DATABASE=postgres
 						;;
 					s)
+						# create a CE deployment
 						KSBX_TYPE=standalone
 						;;
 					t)
+						# the description of the namespace or sandbox
 						KSBX_DESCRIPTION="$OPTARG"
 						;;
 					v)
+						# the base version to use to look up the versions of each of the products
 						sandboxVersion=$OPTARG
 						;;
 					:)
@@ -627,13 +624,13 @@ if [[ $# -gt 0 ]]; then
 				esac
 			done
 			NAMESPACE=ksandbox-$(nextFreeNamespace)
-			if [[ -z $KSBX_DESCRIPTION || -z $sandboxVersion ]]; then
-				echo "[FATAL]Both -v and -t must be set"
+			if [[ -z $sandboxVersion ]]; then
+				echo "[FATAL]Must specify a sandbox version"
 				help
 				exit 1
 			fi
 			if [[ $KSBX_TYPE == 'standalone' && $INSTALL_EDGE == 'true' ]]; then
-				echo "[FATAL]Use -m or -s. Cannot install MDCB with standalone deployment."
+				echo "[FATAL]Use -m or -s not both. Cannot install MDCB with standalone deployment."
 				exit 1
 			fi
 			if [[ $INSTALL_EDGE == 'true' ]]; then
@@ -697,9 +694,10 @@ if [[ $# -gt 0 ]]; then
 						enableHybrid $KSBX_ORG_ID $KSBX_ADMIN_API_KEY
 						applyYAML tyk-mdcb-configmap-mongo.yaml edge-redis.yaml tyk-gateway-configmap-edge.yaml
 						waitDeploymentReady edge-redis
+						# deploy MDCB
 						applyYAML tyk-mdcb.yaml
 						waitDeploymentReady tyk-sink
-						# deploy edge gateways
+						# deploy edge gateway(s)
 						applyYAML tyk-gateway-edge.yaml
 						waitDeploymentReady edge-gateway
 						applyYAML tyk-gateway-svc-edge.yaml
@@ -753,6 +751,10 @@ if [[ $# -gt 0 ]]; then
 			NAMESPACE=$1
 			shift
 			showLogs $1
+			;;
+		modify)
+			# modify the number of pods or the version deployed
+			:
 			;;
 		pods)
 			shift
