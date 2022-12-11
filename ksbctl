@@ -754,7 +754,65 @@ if [[ $# -gt 0 ]]; then
 			;;
 		modify)
 			# modify the number of pods or the version deployed
-			:
+			shift
+			if [[ $# -lt 4 ]]; then
+				echo "[FATAL]Not enough arguments to 'modify'"
+				help
+				exit 1
+			fi
+			NAMESPACE=$1
+			shift
+			typeset deploymentName
+			deploymentName=$1
+			shift
+			typeset newPodCount; typeset newPodVersion
+			newPodCount=''; newPodVersion=''
+			if namespaceExists $NAMESPACE; then
+				while getopts c:v: arg; do
+					case $arg in
+						c)
+							# change the number of pods deployed
+							newPodCount=$OPTARG
+							;;
+						v)
+							# change the number of pods deployed
+							newPodVersion=$OPTARG
+							;;
+						:)
+							echo "[FATAL]Option -$OPTARG requires an arguement."
+							exit 1
+							;;
+						\?)
+							echo "[FATAL]Invalid option: -$OPTARG"
+							exit 1
+							;;
+					esac
+				done
+				if [[ -n $newPodCount || -n $newPodVersion ]]; then
+					# grab the deployment and update it
+					typeset tmpDeploymentYaml
+					tmpDeploymentYaml=$(mktemp /tmp/deployment.XXXX.yaml)
+					echo "[INFO]kubectl get deploy -n $NAMESPACE $deploymentName -o yaml > $tmpDeploymentYaml"
+					kubectl get deploy -n $NAMESPACE $deploymentName -o yaml > $tmpDeploymentYaml
+					if [[ -n $newPodCount ]]; then
+						yq ".spec.replicas = $newPodCount" -i $tmpDeploymentYaml
+					fi
+					if [[ -n $newPodVersion ]]; then
+						typeset currentVersion
+						currentVersion=$(yq .spec.template.spec.containers.[0].image $tmpDeploymentYaml | cut -d: -f2)
+						echo sed -i "s/$currentVersion/$newPodVersion/" $tmpDeploymentYaml
+						sed -i "s/$currentVersion/$newPodVersion/" $tmpDeploymentYaml
+					fi
+					echo "[INFO]kubectl apply -f $tmpDeploymentYaml -n $NAMESPACE"
+					kubectl apply -f $tmpDeploymentYaml -n $NAMESPACE
+					echo "[INFO]kubectl rollout status deployment $deploymentName -n $NAMESPACE"
+					kubectl rollout status deployment $deploymentName -n $NAMESPACE
+					rm -f $tmpDeploymentYaml
+				fi
+			else
+				echo "[FATAL]No such ksandbox"
+				exit 1
+			fi
 			;;
 		pods)
 			shift
@@ -763,7 +821,12 @@ if [[ $# -gt 0 ]]; then
 				exit 1
 			fi
 			NAMESPACE=$1
-			listPods
+			if namespaceExists $NAMESPACE; then
+				listPods
+			else
+				echo "[FATAL]No such ksandbox"
+				exit 1
+			fi
 			;;
 		publish)
 			shift
