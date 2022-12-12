@@ -35,7 +35,7 @@ spec:
         env:
           - name: TYK_LOGLEVEL
             value: "debug"
-        command: ["/opt/tyk-sink/tyk-sink", "--conf=/etc/tyk-sink/tyk_sink.conf"]
+        command: ["/opt/tyk-sink/tyk-sink", "-c", "/etc/tyk-sink/tyk_sink.conf"]
         workingDir: /opt/tyk-sink
         ports:
         - containerPort: 9090
