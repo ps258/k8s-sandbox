@@ -3,12 +3,16 @@
 # Note that the refNo ends up as the image version with an index after a hyphen (-)
 # so its important not to have a hyphen in the refNo.
 # 3.2.2.rc7 is OK
-# 3.2.2r-rc7 is not OK
+# 3.2.2-rc7 is not OK
 
 # This file also serves as a reference to identify what versions were released together
 # It's not perfect but represents a real effort to pair up the versions that were current at the time
 # Note that there's no RPM for tyk-sync 1.0.0 in package cloud
 # Versions 2.9.3.2 and earlier should use tyk-sync 1.0.0 but 1.1.0 has been substitued.
+
+# Gateway 4.3.x
+4.3.0,4.3.0-1,4.3.0,1.7.0-1,,1.2.3-1,2.0.4-1
+4.3.0-rc8,4.3.0~rc8-1,4.3.0~rc5,1.7.0-1,,1.2.3-1,2.0.4-1
 
 # Gateway 4.2.x
 4.2.4,4.2.4-1,4.2.4,1.6.0-1,,1.2.2-1,2.0.4-1
@@ -21,6 +25,7 @@
 4.1.0,4.1.0-1,4.1.0,1.6.0-1,,1.2.1-1
 
 # Gateway 4.0.x
+4.0.10,4.0.10-1,4.0.10-1,1.7.0-1,,1.2.3-1,2.0.4-1
 4.0.9,4.0.9-1,4.0.9-1,1.6.0-1,,1.2.1-1
 4.0.8,4.0.8-1,4.0.8-1,1.6.0-1,,1.2.1-1
 4.0.7,4.0.7-1,4.0.7-1,1.6.0-1,,1.2.1-1
