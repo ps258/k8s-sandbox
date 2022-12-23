@@ -87,10 +87,13 @@ function help {
 	echo "      -s deploy a stand alone gateway"
 	echo "      -t description of the sandbox namespace"
 	echo "      -v version tag. The file $VERSIONFILE contains the versions used"
-	echo "$name delete <sandbox namespace>"
+	echo "$name delete <sandbox namespace...>"
 	echo "      Delete the sandbox namespace given as a tag and all resources in it"
-	echo "$name info <sandbox namespace>"
-	echo "      Print info on the particular sandbox namespace"
+	echo "$name info <sandbox namespace...>"
+	echo "      Print info detailed info on sandbox namespaces"
+	echo "$name init"
+	echo "      Initialise minikube to enable persistent volumes"
+	echo "      This only needs to be done once in a minikube cluster"
 	echo "$name list"
 	echo "      List all sandbox namespaces"
 	echo "$name logs <sandbox namespace> <podname>"
@@ -100,10 +103,16 @@ function help {
 	echo "      -c change the deployment to have the new number of pods"
 	echo "      -v rollout the named version into the pods. No checking of the version is done"
 	echo "         so make sure it's rigth"
+	echo "$name pods <sandbox namespace...>"
+	echo "      List pods in namespace"
+	echo "$name publish <sandbox namespace> <API Json files...>"
+	echo "      Publish API contained in JSON files into a sandbox"
 	echo "$name shell <sandbox namespace> <podname>"
 	echo "      Start an interactive shell in the pod."
 	echo "      The pod name can be a substring of the actual name"
 	echo "      eg. $name shell ksandbox-1 dashboard"
+	echo "$name start"
+	echo "      Start the minikube cluster if it's not running"
 }
 
 # find the next namespace index that's unused
@@ -147,23 +156,44 @@ function checkMongoShellInstalled {
 	fi
 }
 
-
-# create or start minikube if it's not already running
-function startMinikube {
+# checks done to setup env on every run
+function setGlobals {
 	if which minikube > /dev/null 2>&1 ; then
 		alias kubectl="minikube kubectl -- "
-		if ! minikube status > /dev/null 2>&1 ;then
-			echo "[INFO]Starting minikube"
-			# check for command dependencies
-			checkCommandInstalled redis-cli jq envsubst psql
-			minikube start --driver docker --cpus max --memory max
-			minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
-			# give it a few seconds to settle down
-			sleep 10
-		fi
+		# check for command dependencies
+		checkCommandInstalled redis-cli jq envsubst psql
 		IP=$(minikube ip)
 	else
 		IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
+	fi
+}
+
+# copy "$SCRIPTDIR/etc/tmp.conf" into minikube so that permanent volumes can be created
+function initMinikube {
+	if which minikube > /dev/null 2>&1 ; then
+		if ! minikube status > /dev/null 2>&1 ;then
+			echo "[INFO]Configuring minikube to enable permanent volumes for databases"
+			minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
+		fi
+	else
+		echo "[WARN]Minikube not installed. Cannot configure"
+	fi
+}
+
+# start minikube if it's not already running
+function startMinikube {
+	if which minikube > /dev/null 2>&1 ; then
+		if ! minikube status > /dev/null 2>&1 ;then
+			echo "[INFO]Starting minikube"
+			# check for command dependencies
+			minikube start --driver docker --cpus max --memory max
+			# give it a few seconds to settle down
+			sleep 5
+		else
+			echo "[WARN]Minikube already running. Not starting it again"
+		fi
+	else
+		echo "[WARN]Minikube not installed. Cannot start"
 	fi
 }
 
@@ -575,8 +605,8 @@ function publishAPIs {
 
 # Process commands and take actions
 if [[ $# -gt 0 ]]; then
-	# make sure minikube is running and populate IP, the IP address it uses
-	startMinikube
+	# setup global aliases and variables
+	setGlobals
 	case $1 in 
 		create)
 			shift
@@ -742,7 +772,31 @@ if [[ $# -gt 0 ]]; then
 			;;
 		help)
 			help
-			exit 0
+			;;
+		info)
+			shift
+			if [[ $# -lt 1 ]]; then
+				echo "[FATAL]Must provide namespace"
+				exit 1
+			fi
+			for NAMESPACE in $*; do
+				if namespaceExists $NAMESPACE; then
+					# set KSBX_DATABASE for this namespace
+					getDatabaseType
+					# find if it's a pro or standalone install
+					getInstallType
+					echo "[INFO]$NAMESPACE"
+					showTykVersions
+					listPods
+					reportSanboxInfo
+				else
+					echo "[WARN]Namespace '$NAMESPACE' not found"
+				fi
+			done
+			;;
+		init)
+			startMinikube
+			initMinikube
 			;;
 		list)
 			echo "[INFO]kubectl get namespaces --selector=$NAMESPACE_SELECTOR"
@@ -829,13 +883,14 @@ if [[ $# -gt 0 ]]; then
 				echo "[FATAL]Must provide namespace"
 				exit 1
 			fi
-			NAMESPACE=$1
-			if namespaceExists $NAMESPACE; then
-				listPods
-			else
-				echo "[FATAL]No such ksandbox"
-				exit 1
-			fi
+			for NAMESPACE in $*; do
+				if namespaceExists $NAMESPACE; then
+					echo "[INFO]$NAMESPACE"
+					listPods
+				else
+					echo "[FATAL]No such ksandbox"
+				fi
+			done
 			;;
 		publish)
 			shift
@@ -847,27 +902,6 @@ if [[ $# -gt 0 ]]; then
 			shift
 			publishAPIs "$@"
 			;;
-		info)
-			shift
-			if [[ $# -lt 1 ]]; then
-				echo "[FATAL]Must provide namespace"
-				exit 1
-			fi
-			for NAMESPACE in $*; do
-				if namespaceExists $NAMESPACE; then
-					# set KSBX_DATABASE for this namespace
-					getDatabaseType
-					# find if it's a pro or standalone install
-					getInstallType
-					echo "[INFO]$NAMESPACE"
-					showTykVersions
-					listPods
-					reportSanboxInfo
-				else
-					echo "[WARN]Namespace '$NAMESPACE' not found"
-				fi
-			done
-			;;
 		shell)
 			shift
 			if [[ $# -lt 1 ]]; then
@@ -877,6 +911,9 @@ if [[ $# -gt 0 ]]; then
 			NAMESPACE=$1
 			shift
 			runShell $*
+			;;
+		start)
+			startMinikube
 			;;
 		*)
 			echo "[FATAL]$1 not implemented"
