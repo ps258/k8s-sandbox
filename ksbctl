@@ -131,7 +131,7 @@ function nextFreeNamespace {
 
 function checkCommandInstalled {
 	typeset cmd
-	echo "[INFO]Checking for these commands: $*"
+	#echo "[INFO]Checking for these commands: $*"
 	for cmd in $*; do
 		if ! which $cmd >/dev/null; then
 			echo "[FATAL]Command '$cmd' not found. Cannot continue"
@@ -158,10 +158,10 @@ function checkMongoShellInstalled {
 
 # checks done to setup env on every run
 function setGlobals {
+	checkCommandInstalled redis-cli jq envsubst psql yq
 	if which minikube > /dev/null 2>&1 ; then
 		alias kubectl="minikube kubectl -- "
 		# check for command dependencies
-		checkCommandInstalled redis-cli jq envsubst psql
 		IP=$(minikube ip)
 	else
 		IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
