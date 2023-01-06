@@ -46,6 +46,7 @@ NAMESPACE_SELECTOR_LABEL="creator=ksbctl"
 NAMESPACE=''
 EXTRA_NAMESPACE_LABELS=''
 ISTIO_INJECTION_LABEL='istio-injection=enabled'
+POD_MONITOR_FREQ=5
 KSBX_DESCRIPTION='N/A'
 KSBX_DATABASE=mongo
 KSBX_TYPE=pro
@@ -105,6 +106,8 @@ function help {
 	echo "      -c change the deployment to have the new number of pods"
 	echo "      -v rollout the named version into the pods. No checking of the version is done"
 	echo "         so make sure it's rigth"
+	echo "$name monitor <sandbox namespace> <pod name>"
+	echo "      Print CPU and memory usage for the containers in the pod ever $POD_MONITOR_FREQ seconds"
 	echo "$name pods <sandbox namespace...>"
 	echo "      List pods in namespace"
 	echo "$name publish <sandbox namespace> <API Json files...>"
@@ -886,9 +889,26 @@ if [[ $# -gt 0 ]]; then
 					rm -f $tmpDeploymentYaml
 				fi
 			else
-				echo "[FATAL]No such ksandbox"
+				echo "[FATAL]No such ksandbox: $NAMESPACE"
 				exit 1
 			fi
+			;;
+		monitor)
+			shift
+			typeset monitorPodName
+			NAMESPACE=$1
+			if [[ $# -lt 2 ]]; then
+				echo "[FATAL]Must provide namespace and podname"
+				exit 1
+			fi
+			monitorPodName=$(kubectl get pods -n $NAMESPACE | awk '/'$2'/ {print $1}' | head -1)
+			echo "[INFO]Monitoring $monitorPodName CPU and Memory every $POD_MONITOR_FREQ s"
+			echo "[INFO]kubectl top pod $monitorPodName -n $NAMESPACE --containers --no-headers=true"
+			while true; do
+				date +%F_%T
+				kubectl top pod $monitorPodName -n $NAMESPACE --containers --no-headers=true
+				sleep $POD_MONITOR_FREQ
+			done
 			;;
 		pods)
 			shift
@@ -901,7 +921,7 @@ if [[ $# -gt 0 ]]; then
 					echo "[INFO]$NAMESPACE"
 					listPods
 				else
-					echo "[FATAL]No such ksandbox"
+					echo "[FATAL]No such ksandbox: $NAMESPACE"
 				fi
 			done
 			;;
@@ -913,7 +933,11 @@ if [[ $# -gt 0 ]]; then
 			fi
 			NAMESPACE=$1
 			shift
-			publishAPIs "$@"
+			if namespaceExists $NAMESPACE; then
+				publishAPIs "$@"
+			else
+				echo "[FATAL]No such ksandbox: $NAMESPACE"
+			fi
 			;;
 		shell)
 			shift
