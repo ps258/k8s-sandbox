@@ -402,7 +402,7 @@ function namespaceExists {
 # KSBX_PUMP_VERS which has the pump version. This is used to pull the pump docker image
 # KSBX_MDCB_VERS which has the MDCB version. This is used to pull the MDCB docker image
 # KSBX_NS which is the namespace for the pods etc.
-function applyYAML {
+function applyYAMLtemplate {
 	typeset YAML
 	typeset YAMLfile
 	YAML=""
@@ -698,27 +698,27 @@ if [[ $# -gt 0 ]]; then
 					createNamespace
 					if [[ $KSBX_DATABASE == 'mongo' ]]; then
 						echo "[INFO]Starting redis and mongo in the control plane"
-						applyYAML mongo.yaml control-redis.yaml # grpc-plugin.yaml
+						applyYAMLtemplate mongo.yaml control-redis.yaml # grpc-plugin.yaml
 						waitDeploymentReady control-redis
 						waitDeploymentReady mongo-db
 					elif [[ $KSBX_DATABASE == 'postgres' ]]; then
 						echo "[INFO]Starting redis and postgres in the control plane"
-						applyYAML postgres.yaml control-redis.yaml # grpc-plugin.yaml
+						applyYAMLtemplate postgres.yaml control-redis.yaml # grpc-plugin.yaml
 						waitDeploymentReady control-redis
 						waitDeploymentReady postgres-db
 					fi
 					echo "[INFO]Starting dashboard, pump and gateway"
 					# setup configmaps first
-					applyYAML tyk-gateway-configmap-control.yaml
+					applyYAMLtemplate tyk-gateway-configmap-control.yaml
 					if [[ $KSBX_DATABASE == 'mongo' ]]; then
-						applyYAML tyk-dashboard-configmap-mongo.yaml tyk-pump-configmap-mongo.yaml
+						applyYAMLtemplate tyk-dashboard-configmap-mongo.yaml tyk-pump-configmap-mongo.yaml
 					elif [[ $KSBX_DATABASE == 'postgres' ]]; then
-						applyYAML tyk-dashboard-configmap-postgres.yaml tyk-pump-configmap-postgres.yaml
+						applyYAMLtemplate tyk-dashboard-configmap-postgres.yaml tyk-pump-configmap-postgres.yaml
 					fi
 					# create dashboard, control gateway and pump deployments
-					applyYAML tyk-dashboard.yaml tyk-gateway-control.yaml tyk-pump.yaml
+					applyYAMLtemplate tyk-dashboard.yaml tyk-gateway-control.yaml tyk-pump.yaml
 					# create dashboard and control gateway services
-					applyYAML tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
+					applyYAMLtemplate tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
 					waitDeploymentReady tyk-dashboard
 					waitDeploymentReady control-gateway
 					licenseDashboard
@@ -728,15 +728,15 @@ if [[ $# -gt 0 ]]; then
 						export KSBX_ADMIN_API_KEY=$(getAdminUserKey)
 						export KSBX_ORG_ID=$(getOrgID)
 						enableHybrid $KSBX_ORG_ID $KSBX_ADMIN_API_KEY
-						applyYAML tyk-mdcb-configmap-mongo.yaml edge-redis.yaml tyk-gateway-configmap-edge.yaml
+						applyYAMLtemplate tyk-mdcb-configmap-mongo.yaml edge-redis.yaml tyk-gateway-configmap-edge.yaml
 						waitDeploymentReady edge-redis
 						# deploy MDCB
-						applyYAML tyk-mdcb.yaml
+						applyYAMLtemplate tyk-mdcb.yaml
 						waitDeploymentReady tyk-sink
 						# deploy edge gateway(s)
-						applyYAML tyk-gateway-edge.yaml
+						applyYAMLtemplate tyk-gateway-edge.yaml
 						waitDeploymentReady edge-gateway
-						applyYAML tyk-gateway-svc-edge.yaml
+						applyYAMLtemplate tyk-gateway-svc-edge.yaml
 					fi
 					publishAPIs $SCRIPTDIR/APIs/*.json
 					listPods
@@ -745,11 +745,11 @@ if [[ $# -gt 0 ]]; then
 					# create standalone (CE) deployment of the gateway
 					loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
 					createNamespace
-					applyYAML control-redis.yaml
+					applyYAMLtemplate control-redis.yaml
 					waitDeploymentReady control-redis
-					applyYAML tyk-gateway-configmap-standalone.yaml
-					applyYAML tyk-gateway-standalone.yaml
-					applyYAML tyk-gateway-svc-standalone.yaml
+					applyYAMLtemplate tyk-gateway-configmap-standalone.yaml
+					applyYAMLtemplate tyk-gateway-standalone.yaml
+					applyYAMLtemplate tyk-gateway-svc-standalone.yaml
 					waitDeploymentReady standalone-gateway
 					publishAPIs $SCRIPTDIR/APIs/*.json
 					listPods
