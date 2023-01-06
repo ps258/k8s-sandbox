@@ -42,8 +42,10 @@ SCRIPTDIR=$(
 )
 VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
 YAMLDIR="$SCRIPTDIR/YAML"
-NAMESPACE_SELECTOR="creator=ksbctl"
+NAMESPACE_SELECTOR_LABEL="creator=ksbctl"
 NAMESPACE=''
+EXTRA_NAMESPACE_LABELS=''
+ISTIO_INJECTION_LABEL='istio-injection=enabled'
 KSBX_DESCRIPTION='N/A'
 KSBX_DATABASE=mongo
 KSBX_TYPE=pro
@@ -119,7 +121,7 @@ function help {
 function nextFreeNamespace {
 	typeset existing
 	typeset i
-	existing=$(kubectl get namespaces --selector=$NAMESPACE_SELECTOR --no-headers=true 2>/dev/null | awk '{print $1}')
+	existing=$(kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL --no-headers=true 2>/dev/null | awk '{print $1}')
 	for i in $(seq 1 1000); do
 		test="ksandbox-$i"
 		if ! echo $existing | grep -qw $test; then
@@ -187,6 +189,7 @@ function startMinikube {
 			echo "[INFO]Starting minikube"
 			# check for command dependencies
 			minikube start --driver docker --cpus max --memory max
+			minikube addons enable metrics-server
 			# give it a few seconds to settle down
 			sleep 5
 		else
@@ -349,6 +352,12 @@ function reportSanboxInfo {
 		echo "$NAMESPACE.gateway:   http://$IP:$(getStandaloneGatewayPort)/"
 		echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getControlRedisPort)"
 	fi
+	# if the namespace has the label 'istio-injection=enabled' then report the istio-system services
+	if kubectl get ns --show-labels --no-headers=true $NAMESPACE | grep -q $ISTIO_INJECTION_LABEL; then
+		echo "Kiali:                        http://$IP:$(kubectl get svc -n istio-system kiali --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
+		echo "Grafana:                      http://$IP:$(kubectl get svc -n istio-system grafana --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
+		echo "Tracing:                      http://$IP:$(kubectl get svc -n istio-system tracing --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
+	fi
 }
 
 function createNamespace {
@@ -357,8 +366,8 @@ function createNamespace {
 	if ! namespaceExists $NAMESPACE; then
 		echo "[INFO]kubectl create ns $NAMESPACE"
 		kubectl create ns $NAMESPACE
-		echo "[INFO]kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR"
-		kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR
+		echo "[INFO]kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR_LABEL $EXTRA_NAMESPACE_LABELS"
+		kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR_LABEL $EXTRA_NAMESPACE_LABELS
 		# setup config map in the new namespace with the details of the deployment
 		echo "apiVersion: v1" > $configYAML
 		echo "data:" >> $configYAML
@@ -610,7 +619,7 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts c:e:mp:st:v: arg; do
+			while getopts c:e:imp:st:v: arg; do
 				case $arg in
 					c)
 						# the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -621,6 +630,10 @@ if [[ $# -gt 0 ]]; then
 						# the number of edge gateways to deploy (must be combined with -m to deploy MDCB)
 						# defaults to one
 						KSBX_EDGE_GATEWAY_REPLICAS=$OPTARG
+						;;
+					i)
+						# add the istio label to the namespace so it's picked up by istio
+						EXTRA_NAMESPACE_LABELS="$ISTIO_INJECTION_LABEL $EXTRA_NAMESPACE_LABELS"
 						;;
 					m)
 						# deploy with MDCB, edge redis and edge gateways
@@ -799,8 +812,8 @@ if [[ $# -gt 0 ]]; then
 			initMinikube
 			;;
 		list)
-			echo "[INFO]kubectl get namespaces --selector=$NAMESPACE_SELECTOR"
-			kubectl get namespaces --selector=$NAMESPACE_SELECTOR
+			echo "[INFO]kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL"
+			kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL
 			;;
 		log*)
 			shift
