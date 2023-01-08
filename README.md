@@ -14,6 +14,7 @@
 						Create a tyk instance in a namespace sandbox with the version given as a tag with -v
 						-e the number of edge gateway replicas to run
 						-c the number of gateway replicas to run
+						-i add the istio label to the namespace so istio is injected into the pods
 						-m run MDCB and configure edge gateways
 						-p deploy with postgres not mongo
 						-s deploy a stand alone gateway
@@ -35,10 +36,12 @@
 						-c change the deployment to have the new number of pods
 						-v rollout the named version into the pods. No checking of the version is done
 							 so make sure it's rigth
+			ksbctl monitor <sandbox namespace> <pod name>
+						Print CPU and memory usage for the containers in the pod ever 5 seconds
 			ksbctl pods <sandbox namespace...>
 						List pods in namespace
-			ksbctl publish <sandbox namespace> <API Json files...>
-						Publish API contained in JSON files into a sandbox
+			ksbctl publish <sandbox namespace> <api.json ...>
+						Publish the API in api.json into the sandbox
 			ksbctl shell <sandbox namespace> <podname>
 						Start an interactive shell in the pod.
 						The pod name can be a substring of the actual name
