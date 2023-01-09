@@ -392,7 +392,7 @@ function createNamespace {
 		fi
 		echo "  KSBX_TYPE: $KSBX_TYPE" >> $configYAML
 		echo "  KSBX_DATABASE: $KSBX_DATABASE" >> $configYAML
-		echo "  KSBX_DESCRIPTION: $KSBX_DESCRIPTION" >> $configYAML
+		echo "  KSBX_DESCRIPTION: \"$KSBX_DESCRIPTION\"" >> $configYAML
 		echo "kind: ConfigMap" >> $configYAML
 		echo "metadata:" >> $configYAML
 		echo "  namespace: \"$NAMESPACE\"" >> $configYAML
@@ -400,7 +400,8 @@ function createNamespace {
 		kubectl apply -f $configYAML -n $NAMESPACE
 		echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
-	rm -f $configYAML
+	echo $configYAML
+	#rm -f $configYAML
 }
 
 function namespaceExists {
@@ -623,7 +624,7 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts c:e:imp:st:v: arg; do
+			while getopts c:e:impst:v: arg; do
 				case $arg in
 					c)
 						# the number of control gateways to deploy (these are also just gateways in the pro install)
