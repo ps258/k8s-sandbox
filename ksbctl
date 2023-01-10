@@ -192,7 +192,7 @@ function startMinikube {
 		if ! minikube status > /dev/null 2>&1 ;then
 			echo "[INFO]Starting minikube"
 			# check for command dependencies
-			minikube start --driver docker --cpus max --memory max
+			minikube start --driver docker --cpus max --memory max --docker-opt="default-ulimit=nofile=102400:102400"
 			minikube addons enable metrics-server
 			# give it a few seconds to settle down
 			sleep 5
@@ -405,8 +405,13 @@ function createNamespace {
 }
 
 function namespaceExists {
-	kubectl get namespaces --no-headers=true | grep -wq $NAMESPACE
-	return $?
+	typeset ns
+	for ns in $(kubectl get namespaces --no-headers=true | awk '{print $1}'); do
+		if [[ "$ns" == $NAMESPACE ]]; then
+			return 0
+		fi
+	done
+	return 1
 }
 
 # Process the YAML with envsubst to substitute environment variables into them
