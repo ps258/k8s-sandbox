@@ -365,7 +365,7 @@ function reportSanboxInfo {
 }
 
 function createNamespace {
-	typeset configYAML=$(mktemp /tmp/configYAML.yaml.XXXX)
+	typeset configYAML
 	configYAML=$(mktemp /tmp/configYAML.yaml.XXXX)
 	if ! namespaceExists $NAMESPACE; then
 		echo "[INFO]kubectl create ns $NAMESPACE"
@@ -954,7 +954,11 @@ if [[ $# -gt 0 ]]; then
 			fi
 			NAMESPACE=$1
 			shift
-			runShell $*
+			if namespaceExists $NAMESPACE; then
+				runShell $*
+			else
+				echo "[FATAL]No such ksandbox: $NAMESPACE"
+			fi
 			;;
 		start)
 			startMinikube
