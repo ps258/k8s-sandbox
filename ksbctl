@@ -59,6 +59,7 @@ KSBX_MDCB_VERS=''
 KSBX_MDCB_LICENSE=''
 KSBX_NS=''
 MONGOSHELL=''
+INSTALL_OPR_CONTEXT=false
 export KSBX_ADMIN_SECRET=admin_secret
 export KSBX_PGPASSWORD=password		# default postgres password
 export KSBX_PGUSER=postgresx			# default postgres username
@@ -81,12 +82,13 @@ function help {
 	typeset name
 	name=$(basename $SCRIPTNAME)
 	echo "[USAGE]:"
-	echo "$name create -v <tyk version> -t <namespace description> [-p|-s] [-c gateway_count]"
+	echo "$name create -v <tyk version> -t <namespace description> [-p|-s] [-c gateway_count] [-e edge_gw_count] [-m] [-o] [-i]"
 	echo "      Create a tyk instance in a namespace sandbox with the version given as a tag with -v"
 	echo "      -e the number of edge gateway replicas to run"
-	echo "      -c the number of gateway replicas to run"
+	echo "      -c the number of control plane gateway replicas to run"
 	echo "      -i add the istio label to the namespace so istio is injected into the pods"
 	echo "      -m run MDCB and configure edge gateways"
+	echo "      -o create OperatorContext for Tyk Operator"
 	echo "      -p deploy with postgres not mongo"
 	echo "      -s deploy a stand alone gateway"
 	echo "      -t description of the sandbox namespace"
@@ -595,7 +597,7 @@ function publishAPIs {
 			fi
 		done
 	else
-		# stand alone
+		# stand alone (ce)
 		typeset gatewaySecret
 		typeset gatewayPort
 		typeset APIs
@@ -622,6 +624,47 @@ function publishAPIs {
 	fi
 }
 
+function deployOperatorContext {
+  typeset adminKey
+  typeset dashURL
+  typeset orgid
+  typeset OperatorContextYAML
+  OperatorContextYAML=$(mktemp /tmp/operatorContext.yaml.XXXX)
+  adminkey=$(getAdminUserKey)
+  dashURL="http://$IP:$(getDashboardPort)/"
+  orgid=$(getOrgID)
+  echo "Deploying operator context into new environment"
+  echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
+  echo "kind: OperatorContext" >> $OperatorContextYAML
+  echo "metadata:" >> $OperatorContextYAML
+  echo "  name: local-operator-context" >> $OperatorContextYAML
+  echo "spec:" >> $OperatorContextYAML
+  echo "  env:" >> $OperatorContextYAML
+  echo "    mode: pro" >> $OperatorContextYAML
+  echo "    auth: $adminkey" >> $OperatorContextYAML
+  echo "    org: $orgid" >> $OperatorContextYAML
+  echo "    url: $dashURL" >> $OperatorContextYAML
+  echo "    insecureSkipVerify: true" >> $OperatorContextYAML
+  echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
+  kubectl apply -f $OperatorContextYAML -n $NAMESPACE
+  rm -f $OperatorContextYAML
+}
+
+function deployAPIs {
+  typeset APIsourceYaml
+  typeset tmpAPIyaml
+  tmpAPIyaml=$(mktemp /tmp/API.yaml.XXXX)
+  for APIsourceYaml in $*; do
+    if [[ -f $APIsourceYaml ]]; then
+      cp $APIsourceYaml $tmpAPIyaml
+      yq ".spec.contextRef.namespace = \"$NAMESPACE\"" -i $tmpAPIyaml
+      echo "[INFO]kubectl apply -f $tmpAPIyaml -n $NAMESPACE"
+      kubectl apply -f $tmpAPIyaml -n $NAMESPACE
+    fi
+  done
+  rm -f $tmpAPIyaml
+}
+
 # Process commands and take actions
 if [[ $# -gt 0 ]]; then
 	# setup global aliases and variables
@@ -629,7 +672,7 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts c:e:impst:v: arg; do
+			while getopts c:e:imopst:v: arg; do
 				case $arg in
 					c)
 						# the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -654,6 +697,10 @@ if [[ $# -gt 0 ]]; then
 						else
 							export KSBX_MDCB_LICENSE=$SBX_MDCB_LICENSE
 						fi
+						;;
+					o)
+						# deploy an operator context into the new namespace
+						INSTALL_OPR_CONTEXT=true
 						;;
 					p)
 						# use postgresql not mongodb
@@ -761,7 +808,12 @@ if [[ $# -gt 0 ]]; then
 						waitDeploymentReady edge-gateway
 						applyYAMLtemplate tyk-gateway-svc-edge.yaml
 					fi
-					publishAPIs $SCRIPTDIR/APIs/*.json
+					if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
+						publishAPIs $SCRIPTDIR/APIs/*.json
+					else
+						deployOperatorContext
+						deployAPIs $SCRIPTDIR/APIs/*.yaml
+					fi
 					listPods
 					reportSanboxInfo 
 				else
