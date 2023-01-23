@@ -402,8 +402,8 @@ function createNamespace {
 		kubectl apply -f $configYAML -n $NAMESPACE
 		echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
-	echo $configYAML
-	#rm -f $configYAML
+	#echo $configYAML
+	rm -f $configYAML
 }
 
 function namespaceExists {
