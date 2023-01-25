@@ -696,7 +696,15 @@ if [[ $# -gt 0 ]]; then
 					e)
 						# the number of edge gateways to deploy (must be combined with -m to deploy MDCB)
 						# defaults to one
-						KSBX_EDGE_GATEWAY_REPLICAS=$OPTARG
+						case $OPTARG in
+							+([0-9])*(.)*([0-9]) )
+								KSBX_EDGE_GATEWAY_REPLICAS=$OPTARG
+								;;
+							*)
+								echo "[FATAL]Argument to -e must be the number of edge gateways to deploy"
+								exit 1
+								;;
+							esac
 						;;
 					i)
 						# add the istio label to the namespace so it's picked up by istio
