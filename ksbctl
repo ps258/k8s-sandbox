@@ -697,7 +697,7 @@ if [[ $# -gt 0 ]]; then
 						# the number of edge gateways to deploy (must be combined with -m to deploy MDCB)
 						# defaults to one
 						case $OPTARG in
-							+([0-9])*(.)*([0-9]) )
+							[0-9]* )
 								KSBX_EDGE_GATEWAY_REPLICAS=$OPTARG
 								;;
 							*)
