@@ -930,11 +930,11 @@ if [[ $# -gt 0 ]]; then
 			;;
 		log*)
 			shift
-			if [[ $# -lt 1 ]]; then
-				echo "[FATAL]Must provide namespace"
+			if [[ $# -lt 2 ]]; then
+				echo "[FATAL]Must provide namespace and pod names"
 				exit 1
 			fi
-			NAMESPACE=$1
+			NAMESPACE=$(getNamespaceNames $1)
 			shift
 			showLogs $1
 			;;
@@ -946,7 +946,7 @@ if [[ $# -gt 0 ]]; then
 				help
 				exit 1
 			fi
-			NAMESPACE=$1
+			NAMESPACE=$(getNamespaceNames $1)
 			shift
 			typeset deploymentName
 			deploymentName=$1
@@ -1006,7 +1006,7 @@ if [[ $# -gt 0 ]]; then
 		monitor)
 			shift
 			typeset monitorPodName
-			NAMESPACE=$1
+			NAMESPACE=$(getNamespaceNames $1)
 			if [[ $# -lt 2 ]]; then
 				echo "[FATAL]Must provide namespace and podname"
 				exit 1
@@ -1041,7 +1041,7 @@ if [[ $# -gt 0 ]]; then
 				echo "[FATAL]Must provide namespace"
 				exit 1
 			fi
-			NAMESPACE=$1
+			NAMESPACE=$(getNamespaceNames $1)
 			shift
 			if namespaceExists $NAMESPACE; then
 				publishAPIs "$@"
@@ -1055,7 +1055,7 @@ if [[ $# -gt 0 ]]; then
 				echo "[FATAL]Must provide namespace"
 				exit 1
 			fi
-			NAMESPACE=$1
+			NAMESPACE=$(getNamespaceNames $1)
 			shift
 			if namespaceExists $NAMESPACE; then
 				runShell $*
