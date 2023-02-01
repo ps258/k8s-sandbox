@@ -686,7 +686,7 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts c:e:imopst:v: arg; do
+			while getopts :c:e:imopst:v: arg; do
 				case $arg in
 					c)
 						# the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -954,7 +954,7 @@ if [[ $# -gt 0 ]]; then
 			typeset newPodCount; typeset newPodVersion
 			newPodCount=''; newPodVersion=''
 			if namespaceExists $NAMESPACE; then
-				while getopts c:v: arg; do
+				while getopts :c:v: arg; do
 					case $arg in
 						c)
 							# change the number of pods deployed
