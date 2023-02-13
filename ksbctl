@@ -293,6 +293,12 @@ function getAdminUserKey {
 }
 
 function getOrgID {
+	curl -s -H "admin-auth: $KSBX_ADMIN_SECRET" http://$IP:$(getDashboardPort)/admin/organisations/ | jq -r .organisations[0].id
+}
+
+function oldgetOrgID {
+	# this doesn't work with 3.1.2 (and perhaps others)
+	# switched to curl method which is so much simpler!
 	typeset redisPort
 	typeset redisKey
 	redisPort=$(getControlRedisPort)
