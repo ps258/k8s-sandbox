@@ -5,9 +5,9 @@
 * Should be really simple to get started on Linux and MacOS. 
 * Checkout this repo.
 * Install the dependencies
-      ksh, redis-cli, jq, envsubst, psql, yq
+      `ksh, redis-cli, jq, envsubst, psql, yq`
 * If using minikube run the following to initialise the minikube cluster
-			./ksbctl init
+			`./ksbctl init`
 
 ### Quick start guide
 
