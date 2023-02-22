@@ -11,10 +11,10 @@
 * To have the sandbox apply a licence, create a user and set its password create a file called `~/.tyk-sandbox` and populate it with 
 
 ```
-			SBX_LICENSE=<your tyk-pro licence>
-			SBX_MDCB_LICENSE=<your MDCB licence>
-			SBX_USER=you.email@address.com
-			SBX_PASSWORD=<base64 encoded password>
+	SBX_LICENSE=<your tyk-pro licence>
+	SBX_MDCB_LICENSE=<your MDCB licence>
+	SBX_USER=you.email@address.com
+	SBX_PASSWORD=<base64 encoded password>
 ```
 
 ### Quick start guide
