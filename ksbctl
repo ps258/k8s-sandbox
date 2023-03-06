@@ -879,21 +879,25 @@ if [[ $# -gt 0 ]]; then
 			for NAMESPACE in $(getNamespaceNames $*); do
 				if namespaceExists $NAMESPACE; then
 					echo "[INFO]Deleting Namespace $NAMESPACE"
+					# clean up the policies first
+					echo "[INFO]Deleting SecurityPolicies from $NAMESPACE"
+					echo "[INFO]kubectl delete SecurityPolicy --all -n $NAMESPACE"
+					kubectl delete SecurityPolicy --all -n $NAMESPACE
 					# clean up the APIs first
 					echo "[INFO]Deleting ApiDefinitions from $NAMESPACE"
-					for API in $(kubectl get ApiDefinition -n $NAMESPACE --no-headers=true | awk '{print $1}'); do
-						# have to remove the API finalizer to stop the namespace delete hanging
-						kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
-					done
+#					for API in $(kubectl get ApiDefinition -n $NAMESPACE --no-headers=true 2>&- | awk '{print $1}'); do
+#						# have to remove the API finalizer to stop the namespace delete hanging
+#						kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
+#					done
 					echo "[INFO]kubectl delete ApiDefinition --all -n $NAMESPACE"
 					kubectl delete ApiDefinition --all -n $NAMESPACE
 					# delete OperatorContext finalizer since it can hang too
 					echo "[INFO]Deleting OperatorContext from $NAMESPACE"
-					for OC in $(kubectl get OperatorContext -n $NAMESPACE --no-headers=true | awk '{print $1}'); do
-						# have to remove the API finalizer to stop the namespace delete hanging
-						kubectl get OperatorContext $OC -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
-					done
-					sleep 1 # needed or the OperatorContext still hangs
+#					for OC in $(kubectl get OperatorContext -n $NAMESPACE --no-headers=true 2>&- | awk '{print $1}'); do
+#						# have to remove the API finalizer to stop the namespace delete hanging
+#						kubectl get OperatorContext $OC -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
+#					done
+#					sleep 1 # needed or the OperatorContext still hangs
 					echo "[INFO]kubectl delete OperatorContext --all -n $NAMESPACE"
 					kubectl delete OperatorContext --all -n $NAMESPACE
 					echo "[INFO]kubectl delete namespace $NAMESPACE --wait"
