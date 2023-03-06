@@ -115,6 +115,9 @@ function help {
 	echo "      List pods in namespace"
 	echo "$name publish <sandbox namespace> <api.json ...>"
 	echo "      Publish the API in api.json into the sandbox"
+	echo "$name setup <operator|istio>"
+	echo "      operator: install the latest version of operator ready for contexts in sandbox namespaces"
+	echo "      istio: setup istio so that it's possible to monitor and configure the sandbox networks"
 	echo "$name shell <sandbox namespace> <podname>"
 	echo "      Start an interactive shell in the pod."
 	echo "      The pod name can be a substring of the actual name"
@@ -218,6 +221,25 @@ function startMinikube {
 	else
 		echo "[WARN]Minikube not installed. Cannot start"
 	fi
+}
+
+function setupOperator {
+	if which helm > /dev/null 2>&1; then
+		kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.8.0/cert-manager.yaml
+		kubectl create namespace tyk-operator-system
+		kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
+		helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
+		helm repo update
+		helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system
+	else
+		echo "[FATAL]Helm not installed. Please install helm and retry"
+		exit 1
+	fi
+}
+
+function setupIstio {
+	echo "[SORRY]Not implemented yet"
+	exit 0
 }
 
 function getPodName {
@@ -885,19 +907,9 @@ if [[ $# -gt 0 ]]; then
 					kubectl delete SecurityPolicy --all -n $NAMESPACE
 					# clean up the APIs first
 					echo "[INFO]Deleting ApiDefinitions from $NAMESPACE"
-#					for API in $(kubectl get ApiDefinition -n $NAMESPACE --no-headers=true 2>&- | awk '{print $1}'); do
-#						# have to remove the API finalizer to stop the namespace delete hanging
-#						kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
-#					done
 					echo "[INFO]kubectl delete ApiDefinition --all -n $NAMESPACE"
 					kubectl delete ApiDefinition --all -n $NAMESPACE
-					# delete OperatorContext finalizer since it can hang too
 					echo "[INFO]Deleting OperatorContext from $NAMESPACE"
-#					for OC in $(kubectl get OperatorContext -n $NAMESPACE --no-headers=true 2>&- | awk '{print $1}'); do
-#						# have to remove the API finalizer to stop the namespace delete hanging
-#						kubectl get OperatorContext $OC -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
-#					done
-#					sleep 1 # needed or the OperatorContext still hangs
 					echo "[INFO]kubectl delete OperatorContext --all -n $NAMESPACE"
 					kubectl delete OperatorContext --all -n $NAMESPACE
 					echo "[INFO]kubectl delete namespace $NAMESPACE --wait"
@@ -1058,6 +1070,24 @@ if [[ $# -gt 0 ]]; then
 			else
 				echo "[FATAL]No such ksandbox: $NAMESPACE"
 			fi
+			;;
+		setup)
+			shift
+			if [[ $# -lt 1 ]]; then
+				echo "Must provide option: 'operator' or 'istio'"
+				exit 1
+			fi
+			case $1 in
+				operator)
+					setupOperator
+					;;
+				istio)
+					setupIstio
+					;;
+				*)
+					echo "Unsupported option: '$1'. Use 'operator' or 'istio'"
+					;;
+			esac
 			;;
 		shell)
 			shift
