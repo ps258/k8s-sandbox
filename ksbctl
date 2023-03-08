@@ -224,13 +224,24 @@ function startMinikube {
 }
 
 function setupOperator {
+	# sleep is needed or the cert manager will refuse connection and the install will fail
+	# if this is run too soon after an init it will fail because things are too busy
 	if which helm > /dev/null 2>&1; then
 		kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.8.0/cert-manager.yaml
+		sleep 5
 		kubectl create namespace tyk-operator-system
 		kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
 		helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
 		helm repo update
-		helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system
+		sleep 5
+		if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system; then
+			echo "[INFO]Operator install failed. Retrying, but only once"
+			kubectl delete ns tyk-operator-system --wait
+			kubectl create namespace tyk-operator-system
+			kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
+			sleep 10
+			helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system
+		fi
 	else
 		echo "[FATAL]Helm not installed. Please install helm and retry"
 		exit 1
