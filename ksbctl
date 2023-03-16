@@ -22,7 +22,7 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			Set versions for mdcb, mongo/redis and postgresql too
 #			Allow commandline override of versions of all components
 #		test on other platforms
-#			windows
+#			(done) windows
 #			(done) MacOS
 #				M1
 #		(done) deploy with MDCB
@@ -31,8 +31,6 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #			golang
 #     share plugin folders with sbctl
 #			python/lua
-#		Convenience commands
-#			performance stats
 
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
@@ -51,6 +49,8 @@ KSBX_DESCRIPTION='N/A'
 KSBX_DATABASE=mongo
 KSBX_TYPE=pro
 INSTALL_EDGE=false
+ENABLE_HTTPS=false
+ENABLE_ISTIO=false
 sandboxVersion=''
 KSBX_GATE_VERS=''
 KSBX_DASH_VERS=''
@@ -86,6 +86,7 @@ function help {
 	echo "      Create a tyk instance in a namespace sandbox with the version given as a tag with -v"
 	echo "      -e the number of edge gateway replicas to run"
 	echo "      -c the number of control plane gateway replicas to run"
+	echo "      -h setup the edge gateways to use https (implies -m and incompatible with -i)"
 	echo "      -i add the istio label to the namespace so istio is injected into the pods"
 	echo "      -m run MDCB and configure edge gateways"
 	echo "      -o create OperatorContext for Tyk Operator"
@@ -108,7 +109,7 @@ function help {
 	echo "      Modify deployment named to have a new number of pods and/or pods at the named version"
 	echo "      -c change the deployment to have the new number of pods"
 	echo "      -v rollout the named version into the pods. No checking of the version is done"
-	echo "         so make sure it's rigth"
+	echo "         so make sure it's right"
 	echo "$name monitor <sandbox namespace> <pod name>"
 	echo "      Print CPU and memory usage for the containers in the pod ever $POD_MONITOR_FREQ seconds"
 	echo "$name pods <sandbox namespace...>"
@@ -153,6 +154,17 @@ function getNamespaceNames {
 	done
 	echo $namespaces
 }
+
+function checkMDCBlicence {
+	# there's no way to install the MDCB licence interactively so we must have it up front
+	if [[ -z $SBX_MDCB_LICENSE ]]; then
+		echo "[FATAl]No MDCB license present in ~/.tyk-sandbox. Please populate with SBX_MDCB_LICENSE=<MDCB LICENSE KEY>"
+		exit 1
+	else
+		export KSBX_MDCB_LICENSE=$SBX_MDCB_LICENSE
+	fi
+}
+
 
 function checkCommandInstalled {
 	typeset cmd
@@ -606,6 +618,56 @@ function enableHybrid {
 	curl -sX PUT http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" -d "$orgJSON"
 }
 
+function enableEdgeHttps {
+	typeset adminKey
+	typeset certID
+	typeset DashboardPort
+	typeset DASH_URL
+	typeset GW_KEY_FILE
+	typeset GW_CRT_FILE
+	typeset GW_CSR_FILE
+	typeset GW_EXT_FILE
+	typeset SAN
+	typeset SUBJECT
+	echo "[INFO]Deploying self signed certificate to the edge gateway"
+	DASH_URL=http://$IP:$(getDashboardPort)
+	adminKey=$(getAdminUserKey)
+	# generate the edge gateway certificate
+	SAN="DNS:localhost, DNS:*.$NAMESPACE.svc.cluster.local"
+	SUBJECT='/emailAddress=email@company.com/C=GB/ST=Mid Lothian/L=Home Office/O=Garage/OU=Desk/CN=tyk-sandbox.com'
+	GW_KEY_FILE=$(mktemp /tmp/XXXXX-gateway-key.pem)
+	GW_CRT_FILE=$(mktemp /tmp/XXXXX-gateway-certificate.pem)
+	GW_CSR_FILE=$(mktemp /tmp/XXXXX-certificate.csr)
+	GW_EXT_FILE=$(mktemp /tmp/XXXXX-extfile.ext)
+	openssl genrsa -des3 -passout pass:ABC-123 -out $GW_KEY_FILE 2048
+	openssl req -new -key $GW_KEY_FILE -passin pass:ABC-123 -subj "$SUBJECT" -out $GW_CSR_FILE
+	cp $GW_KEY_FILE ${GW_KEY_FILE}.orig
+	openssl rsa -in ${GW_KEY_FILE}.orig -out $GW_KEY_FILE -passin pass:ABC-123
+	rm -f ${GW_KEY_FILE}.orig
+	cat > $GW_EXT_FILE <<- EOF
+		subjectKeyIdentifier   = hash
+		authorityKeyIdentifier = keyid:always,issuer:always
+		basicConstraints       = CA:TRUE
+		keyUsage               = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment, keyAgreement, keyCertSign
+		subjectAltName         = $SAN
+		issuerAltName          = issuer:copy
+	EOF
+	openssl x509 -req -in $GW_CSR_FILE -signkey $GW_KEY_FILE -out $GW_CRT_FILE -days 3650 -sha256 -extfile $GW_EXT_FILE
+	cat $GW_KEY_FILE >> $GW_CRT_FILE
+	# add the certificate to the dashboard
+	certID=$(curl -sH "Authorization: $adminKey" "$DASH_URL/api/certs" --form "data=@$GW_CRT_FILE;type=text/plain" | jq -r .id)
+	rm -f $GW_KEY_FILE $GW_CSR_FILE $GW_EXT_FILE $GW_CRT_FILE $GW_CRT_FILE
+	kubectl get deploy edge-gateway -n $NAMESPACE -o yaml | yq eval \
+		'(.spec.template.spec.containers[0].env += { "name": "TYK_GW_HTTPSERVEROPTIONS_USESSL", "value": "True"}) |
+		(.spec.template.spec.containers[0].env += { "name": "TYK_GW_HTTPSERVEROPTIONS_SSLCERTIFICATES", "value": "'$certID'"}) |
+		(.spec.template.spec.containers[0].readinessProbe.httpGet.scheme = "HTTPS") |
+		(.spec.template.spec.containers[0].livenessProbe.httpGet.scheme = "HTTPS")' \
+		| kubectl apply -f -
+}
+
+
+
+
 # Sometimes PersistentVolumeClaim are left when the namespace is deleted.
 # Tidy up any in state 'Released'
 function tidyPVCs {
@@ -725,7 +787,7 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts :c:e:imopst:v: arg; do
+			while getopts :c:e:himopst:v: arg; do
 				case $arg in
 					c)
 						# the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -747,17 +809,18 @@ if [[ $# -gt 0 ]]; then
 						;;
 					i)
 						# add the istio label to the namespace so it's picked up by istio
+						ENABLE_ISTIO=true
 						EXTRA_NAMESPACE_LABELS="$ISTIO_INJECTION_LABEL $EXTRA_NAMESPACE_LABELS"
+						;;
+					h)
+						INSTALL_EDGE=true
+						ENABLE_HTTPS=true
+						checkMDCBlicence
 						;;
 					m)
 						# deploy with MDCB, edge redis and edge gateways
 						INSTALL_EDGE=true
-						if [[ -z $SBX_MDCB_LICENSE ]]; then
-							echo "[FATAl]No MDCB license present in ~/.tyk-sandbox. Please populate with SBX_MDCB_LICENSE=<MDCB LICENSE KEY>"
-							exit 1
-						else
-							export KSBX_MDCB_LICENSE=$SBX_MDCB_LICENSE
-						fi
+						checkMDCBlicence
 						;;
 					o)
 						# deploy an operator context into the new namespace
@@ -795,6 +858,16 @@ if [[ $# -gt 0 ]]; then
 				echo "[FATAL]Must specify a sandbox version"
 				help
 				exit 1
+			fi
+			if [[ $ENABLE_HTTPS == 'true' ]] ; then
+				if [[ $ENABLE_ISTIO == 'true' ]]; then
+					echo "[FATAL]Istio is not compatible with gateway https. Use either -i or -h not both"
+					exit 1
+				fi
+				if [[ $KSBX_TYPE == 'standalone' ]]; then
+					echo "[FATAL]Cannot currently deploy the standalone gateway with https. Use -h or -s not both"
+					exit 1
+				fi
 			fi
 			if [[ $KSBX_TYPE == 'standalone' && $INSTALL_EDGE == 'true' ]]; then
 				echo "[FATAL]Use -m or -s not both. Cannot install MDCB with standalone deployment."
@@ -871,6 +944,9 @@ if [[ $# -gt 0 ]]; then
 						waitDeploymentReady tyk-sink
 						# deploy edge gateway(s)
 						applyYAMLtemplate tyk-gateway-edge.yaml
+						if [[ $ENABLE_HTTPS == 'true' ]]; then
+							enableEdgeHttps
+						fi
 						waitDeploymentReady edge-gateway
 						applyYAMLtemplate tyk-gateway-svc-edge.yaml
 					fi
