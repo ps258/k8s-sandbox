@@ -619,6 +619,7 @@ function enableHybrid {
 }
 
 function enableEdgeHttps {
+	checkCommandInstalled openssl
 	typeset adminKey
 	typeset certID
 	typeset DashboardPort
