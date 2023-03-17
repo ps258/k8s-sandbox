@@ -141,6 +141,7 @@ function nextFreeNamespace {
 	done
 }
 
+# allow the shortcut of using 1 to mean ksandbox-1 on the commandline
 function getNamespaceNames {
 	typeset namespaces
 	typeset namespace
@@ -155,8 +156,8 @@ function getNamespaceNames {
 	echo $namespaces
 }
 
+# there's no way to install the MDCB licence interactively so we must have it up front
 function checkMDCBlicence {
-	# there's no way to install the MDCB licence interactively so we must have it up front
 	if [[ -z $SBX_MDCB_LICENSE ]]; then
 		echo "[FATAl]No MDCB license present in ~/.tyk-sandbox. Please populate with SBX_MDCB_LICENSE=<MDCB LICENSE KEY>"
 		exit 1
@@ -166,9 +167,9 @@ function checkMDCBlicence {
 }
 
 
+# verify that a command is in the PATH
 function checkCommandInstalled {
 	typeset cmd
-	#echo "[INFO]Checking for these commands: $*"
 	for cmd in $*; do
 		if ! which $cmd >/dev/null; then
 			echo "[FATAL]Command '$cmd' not found. Cannot continue"
@@ -177,6 +178,7 @@ function checkCommandInstalled {
 	done
 }
 
+# the mongo shell can be called 'mongo' or 'mongosh' so check for both
 function checkMongoShellInstalled {
 	if [[ -z $MONGOSHELL ]]; then
 		if ! which mongo >/dev/null; then
@@ -201,6 +203,7 @@ function setGlobals {
 		# check for command dependencies
 		IP=$(minikube ip)
 	else
+		# attempt to find a local IP to use. This won't help with a remote K8s cluster
 		IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
 	fi
 }
@@ -260,6 +263,7 @@ function setupOperator {
 	fi
 }
 
+# I need to track down the YAML to do this and save it locally
 function setupIstio {
 	echo "[SORRY]Not implemented yet"
 	exit 0
@@ -269,7 +273,7 @@ function getPodName {
 	kubectl get pods --no-headers=true -n $NAMESPACE | awk '/^'$1'/ {print $1}' | head -1
 }
 
-# wait for a deployment to be ready
+# Wait for a deployment to be ready.
 function waitDeploymentReady {
 	typeset deploymentName
 	deploymentName=$1
@@ -288,12 +292,11 @@ function waitDeploymentReady {
 	echo " done"
 }
 
-# wait for a pod to start
+# Wait for a pod to start (not used anymore)
 function waitPodReady {
 	typeset podName
 	podName=$(getPodName $1)
 	if [[ -n $podName ]]; then
-
 		echo -n "[INFO]Waiting for pod $NAMESPACE:$podName to be ready."
 		while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
 			echo -n .
@@ -319,10 +322,12 @@ function waitPodReady {
 	echo " done"
 }
 
+# return the sandbox-details which is a summary saved when the sandbox is created
 function getDescription {
   kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_DESCRIPTION
 }
 
+# hacky way to retrieve an admin user key from redis
 function getAdminUserKey {
 	typeset redisPort
 	typeset redisKey
@@ -339,22 +344,6 @@ function getAdminUserKey {
 
 function getOrgID {
 	curl -s -H "admin-auth: $KSBX_ADMIN_SECRET" http://$IP:$(getDashboardPort)/admin/organisations/ | jq -r .organisations[0].id
-}
-
-function oldgetOrgID {
-	# this doesn't work with 3.1.2 (and perhaps others)
-	# switched to curl method which is so much simpler!
-	typeset redisPort
-	typeset redisKey
-	redisPort=$(getControlRedisPort)
-	for redisKey in $(redis-cli -h $IP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
-		if [[ $(redis-cli -h $IP -p $redisPort type $redisKey) == 'string' ]]; then
-			if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
-				redis-cli -h $IP -p $redisPort get $redisKey | jq -r .UserData.org_id
-				return 0
-			fi
-		fi
-	done
 }
 
 function getPostgresPort {
@@ -381,13 +370,10 @@ function getDashboardPort {
 	kubectl get svc -n $NAMESPACE tyk-dashboard --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
-function getEdgeGatewayPort {
-	kubectl get svc -n $NAMESPACE edge-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
-}
-
 function getControlGatewayPort {
 	kubectl get svc -n $NAMESPACE control-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
+
 function getEdgeGatewayPort {
 	kubectl get svc -n $NAMESPACE edge-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
@@ -431,6 +417,8 @@ function reportSanboxInfo {
 	fi
 }
 
+# create a namespace for the sandbox and save labels that say what it's for etc.
+# these labels are used internally and are also helpful for remembering why you created the sandbox
 function createNamespace {
 	typeset configYAML
 	configYAML=$(mktemp /tmp/configYAML.yaml.XXXX)
@@ -467,7 +455,6 @@ function createNamespace {
 		kubectl apply -f $configYAML -n $NAMESPACE
 		echo "[INFO]Created namespace '$NAMESPACE'"
 	fi
-	#echo $configYAML
 	rm -f $configYAML
 }
 
@@ -495,12 +482,12 @@ function applyYAMLtemplate {
 	for YAMLfile in $*; do
 		YAMLfile=$(basename $YAMLfile)
 		if [[ -f $YAMLDIR/$YAMLfile ]]; then
-			#echo "[DEBUG]Applying YAML file $YAMLfile" | tee -a /tmp/yaml
 			cat $YAMLDIR/$YAMLfile | envsubst | tee -a /tmp/yaml | kubectl apply -n $NAMESPACE -f -
 		fi
 	done
 }
 
+# apply the licence to the dashboard
 function licenseDashboard {
 	if [[ -n $SBX_LICENSE ]]; then
 		echo "[INFO]Licensing the dashboard"
@@ -508,6 +495,7 @@ function licenseDashboard {
 	fi
 }
 
+# add the user and set their password
 function addDashboardUser {
 	if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
 		SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
@@ -517,6 +505,7 @@ function addDashboardUser {
 	fi
 }
 
+# not used. Not sure why
 function addAPIs {
 	if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
 		# only attempt if we've got a username and password because we need a auth ID
@@ -528,6 +517,7 @@ function listPods {
 	kubectl get pods -n $NAMESPACE
 }
 
+# check if we're on Mongodb or Postgresql
 function getDatabaseType {
 	KSBX_DATABASE=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_DATABASE)
 }
@@ -551,6 +541,7 @@ function showTykVersions {
 	echo $report
 }
 
+# read the versions file and create an array of associated versions
 # isolated to keep IFS from leaking
 function loadVersions {
 	typeset line
@@ -575,6 +566,7 @@ function loadVersions {
 	fi
 }
 
+# spawn a shell in a pod
 function runShell {
 	typeset podType
 	typeset pod
@@ -597,6 +589,7 @@ function runShell {
 	done
 }
 
+# tail the pods logs
 function showLogs {
 	typeset podType
 	typeset pod
@@ -606,6 +599,7 @@ function showLogs {
 	kubectl logs -n $NAMESPACE $pod -f
 }
 
+# Hybrid needs to be enabled for MDCB installs
 function enableHybrid {
 	typeset orgID
 	typeset adminSecret
@@ -618,6 +612,7 @@ function enableHybrid {
 	curl -sX PUT http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" -d "$orgJSON"
 }
 
+# create a self signed certificate, load it into the certificate store and apply the config to the edge gateways
 function enableEdgeHttps {
 	checkCommandInstalled openssl
 	typeset adminKey
@@ -666,11 +661,9 @@ function enableEdgeHttps {
 		| kubectl apply -f -
 }
 
-
-
-
 # Sometimes PersistentVolumeClaim are left when the namespace is deleted.
 # Tidy up any in state 'Released'
+# This happens most when minikube is stopped and restarted
 function tidyPVCs {
 	typeset pvc
 	for pvc in $(kubectl get pv --no-headers=true 2>/dev/null | awk '$5=="Released" {print $1}'); do
@@ -679,8 +672,8 @@ function tidyPVCs {
 	done
 }
 
+# converts API definition format from the one given using 'export' on the dashboard to the one expected when importing via /api/apis
 function createApiDefintion {
-	# converts API definition format from the one given using 'export' on the dashboard to the one expected when importing via /api/apis
 	typeset APIfile
 	APIfile="$1"
 	echo '  {'
@@ -692,6 +685,7 @@ function createApiDefintion {
 	echo '}'
 }
 
+# inject an API definition into a running sandbox
 function publishAPIs {
 	typeset APIfile
 	if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
@@ -740,6 +734,7 @@ function publishAPIs {
 	fi
 }
 
+# Create an operator context in the sandbox
 function deployOperatorContext {
   typeset adminKey
   typeset dashURL
@@ -766,7 +761,8 @@ function deployOperatorContext {
   rm -f $OperatorContextYAML
 }
 
-function deployAPIs {
+# deploy APIs from YAML using operator context
+function deployCRDAPIs {
   typeset APIsourceYaml
   typeset tmpAPIyaml
   tmpAPIyaml=$(mktemp /tmp/API.yaml.XXXX)
@@ -955,7 +951,7 @@ if [[ $# -gt 0 ]]; then
 						publishAPIs $SCRIPTDIR/APIs/*.json
 					else
 						deployOperatorContext
-						deployAPIs $SCRIPTDIR/APIs/*.yaml
+						deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
 					fi
 					listPods
 					reportSanboxInfo 
