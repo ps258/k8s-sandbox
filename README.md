@@ -5,9 +5,10 @@
 * Should be really simple to get started on Linux and MacOS. 
 * Checkout this repo.
 * Install the dependencies
-      `ksh, redis-cli, jq, envsubst, psql, yq`
+      `ksh, redis-cli, jq, envsubst, psql, yq, openssl`
 * If using minikube run the following to initialise the minikube cluster
 			`./ksbctl init`
+* If not using minikube ensure that `kubectl` is configured for the desired K8s cluster
 * To have the sandbox apply a licence, create a user and set its password create a file called `~/.tyk-sandbox` and populate it with 
 
 ```
@@ -16,6 +17,7 @@
 	SBX_USER=you.email@address.com
 	SBX_PASSWORD=<base64 encoded password>
 ```
+* Deploying with MDCB requires the MDCB license to be in `~/.tyk-sandbox` as above, but ordinary use does not.
 
 ### Quick start guide
 
@@ -26,12 +28,13 @@
 						Create a tyk instance in a namespace sandbox with the version given as a tag with -v
 						-e the number of edge gateway replicas to run
 						-c the number of gateway replicas to run
+						-h setup the edge gateways to use https (implies -m and incompatible with -i)
 						-i add the istio label to the namespace so istio is injected into the pods
 						-m run MDCB and configure edge gateways
 						-p deploy with postgres not mongo
 						-s deploy a stand alone gateway
 						-t description of the sandbox namespace
-						-v version tag. The file /home/pstubbs/code/k8s-sandbox/tyk-versions.list contains the versions used
+						-v version tag. The file <install-dir>/k8s-sandbox/tyk-versions.list contains the versions used
 			ksbctl delete <sandbox namespace...>
 						Delete the sandbox namespace given as a tag and all resources in it
 			ksbctl info <sandbox namespace...>
