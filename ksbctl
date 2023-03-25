@@ -890,6 +890,9 @@ if [[ $# -gt 0 ]]; then
 					exit 1
 				fi
 			fi
+			if [[ $KSBX_TYPE == 'standalone' && $KSBX_DATABASE == 'postgres' ]]; then
+				echo "[WARN]Stand alone deployments don't use mongo or postgres. Ignoring -p"
+			fi
 			if [[ $KSBX_TYPE == 'standalone' && $INSTALL_EDGE == 'true' ]]; then
 				echo "[FATAL]Use -m or -s not both. Cannot install MDCB with standalone deployment."
 				exit 1
