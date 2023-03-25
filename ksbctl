@@ -718,47 +718,71 @@ function publishAPIs {
 		API=""
 		# load the APIs
 		for APIfile in "$@"; do
+			echo "[INFO]Publishing API $APIfile"
 			curl -sH "x-tyk-authorization: $gatewaySecret" -d @$APIfile http://$IP:$gatewayPort/tyk/apis
+			echo "[INFO]Hot reloading the gateway"
+			curl -sH "x-tyk-authorization: $gatewaySecret" http://$IP:$gatewayPort/tyk/reload/group
 		done
-		# hot reload the gateway
-		sleep 10
-		curl -sH "x-tyk-authorization: $gatewaySecret" http://$IP:$gatewayPort/tyk/reload/group
 		# report on APIs reloaded
 		sleep 10
 		curl -sH "x-tyk-authorization: $gatewaySecret" http://$IP:$gatewayPort/tyk/apis | jq -r '.[].name' | while read API; do
-		APIs="$API $APIs"
-	done
-	if [[ -n $APIs ]]; then
-		echo "[INFO]Apis published: $APIs"
-	fi
+			APIs="'$API' $APIs"
+		done
+		if [[ -n $APIs ]]; then
+			echo "[INFO]Apis published: $APIs"
+		fi
 	fi
 }
 
 # Create an operator context in the sandbox
 function deployOperatorContext {
   typeset adminKey
-  typeset dashURL
   typeset orgid
   typeset OperatorContextYAML
   OperatorContextYAML=$(mktemp /tmp/operatorContext.yaml.XXXX)
-  adminkey=$(getAdminUserKey)
-  dashURL="http://$IP:$(getDashboardPort)/"
-  orgid=$(getOrgID)
-  echo "Deploying operator context into new environment"
-  echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
-  echo "kind: OperatorContext" >> $OperatorContextYAML
-  echo "metadata:" >> $OperatorContextYAML
-  echo "  name: local-operator-context" >> $OperatorContextYAML
-  echo "spec:" >> $OperatorContextYAML
-  echo "  env:" >> $OperatorContextYAML
-  echo "    mode: pro" >> $OperatorContextYAML
-  echo "    auth: $adminkey" >> $OperatorContextYAML
-  echo "    org: $orgid" >> $OperatorContextYAML
-  echo "    url: $dashURL" >> $OperatorContextYAML
-  echo "    insecureSkipVerify: true" >> $OperatorContextYAML
-  echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
-  kubectl apply -f $OperatorContextYAML -n $NAMESPACE
-  rm -f $OperatorContextYAML
+	if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
+		# Dashboard (pro) install
+		typeset dashURL
+		adminkey=$(getAdminUserKey)
+		dashURL="http://$IP:$(getDashboardPort)/"
+		orgid=$(getOrgID)
+		echo "Deploying operator context into new Pro sandbox"
+		echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
+		echo "kind: OperatorContext" >> $OperatorContextYAML
+		echo "metadata:" >> $OperatorContextYAML
+		echo "  name: local-operator-context" >> $OperatorContextYAML
+		echo "spec:" >> $OperatorContextYAML
+		echo "  env:" >> $OperatorContextYAML
+		echo "    mode: pro" >> $OperatorContextYAML
+		echo "    auth: $adminkey" >> $OperatorContextYAML
+		echo "    org: $orgid" >> $OperatorContextYAML
+		echo "    url: $dashURL" >> $OperatorContextYAML
+		echo "    insecureSkipVerify: true" >> $OperatorContextYAML
+		echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
+		kubectl apply -f $OperatorContextYAML -n $NAMESPACE
+		rm -f $OperatorContextYAML
+	else
+		# stand alone (CE) deployment
+		typeset gatewaySecret
+		typeset gatewayURL
+		gatewaySecret=Secret
+		gatewayURL="http://$IP:$(getStandaloneGatewayPort)/"
+		echo "Deploying operator context into new CE sandbox"
+		echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
+		echo "kind: OperatorContext" >> $OperatorContextYAML
+		echo "metadata:" >> $OperatorContextYAML
+		echo "  name: local-operator-context" >> $OperatorContextYAML
+		echo "spec:" >> $OperatorContextYAML
+		echo "  env:" >> $OperatorContextYAML
+		echo "    mode: ce" >> $OperatorContextYAML
+		echo "    auth: $gatewaySecret" >> $OperatorContextYAML
+		echo "    org: $NAMESPACE" >> $OperatorContextYAML # use the namespace as the org since it's free form with CE
+		echo "    url: $gatewayURL" >> $OperatorContextYAML
+		echo "    insecureSkipVerify: true" >> $OperatorContextYAML
+		echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
+		kubectl apply -f $OperatorContextYAML -n $NAMESPACE
+		rm -f $OperatorContextYAML
+	fi
 }
 
 # deploy APIs from YAML using operator context
@@ -965,7 +989,12 @@ if [[ $# -gt 0 ]]; then
 					applyYAMLtemplate tyk-gateway-standalone.yaml
 					applyYAMLtemplate tyk-gateway-svc-standalone.yaml
 					waitDeploymentReady standalone-gateway
-					publishAPIs $SCRIPTDIR/APIs/*.json
+					if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
+						publishAPIs $SCRIPTDIR/APIs/*.json
+					else
+						deployOperatorContext
+						deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
+					fi
 					listPods
 					reportSanboxInfo 
 				fi
