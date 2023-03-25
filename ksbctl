@@ -324,7 +324,7 @@ function waitPodReady {
 
 # return the sandbox-details which is a summary saved when the sandbox is created
 function getDescription {
-  kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_DESCRIPTION
+	kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_DESCRIPTION
 }
 
 # hacky way to retrieve an admin user key from redis
@@ -736,10 +736,10 @@ function publishAPIs {
 
 # Create an operator context in the sandbox
 function deployOperatorContext {
-  typeset adminKey
-  typeset orgid
-  typeset OperatorContextYAML
-  OperatorContextYAML=$(mktemp /tmp/operatorContext.yaml.XXXX)
+	typeset adminKey
+	typeset orgid
+	typeset OperatorContextYAML
+	OperatorContextYAML=$(mktemp /tmp/operatorContext.yaml.XXXX)
 	if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
 		# Dashboard (pro) install
 		typeset dashURL
@@ -787,18 +787,18 @@ function deployOperatorContext {
 
 # deploy APIs from YAML using operator context
 function deployCRDAPIs {
-  typeset APIsourceYaml
-  typeset tmpAPIyaml
-  tmpAPIyaml=$(mktemp /tmp/API.yaml.XXXX)
-  for APIsourceYaml in $*; do
-    if [[ -f $APIsourceYaml ]]; then
-      cp $APIsourceYaml $tmpAPIyaml
-      yq ".spec.contextRef.namespace = \"$NAMESPACE\"" -i $tmpAPIyaml
-      echo "[INFO]kubectl apply -f $tmpAPIyaml -n $NAMESPACE"
-      kubectl apply -f $tmpAPIyaml -n $NAMESPACE
-    fi
-  done
-  rm -f $tmpAPIyaml
+	typeset APIsourceYaml
+	typeset tmpAPIyaml
+	tmpAPIyaml=$(mktemp /tmp/API.yaml.XXXX)
+	for APIsourceYaml in $*; do
+		if [[ -f $APIsourceYaml ]]; then
+			cp $APIsourceYaml $tmpAPIyaml
+			yq ".spec.contextRef.namespace = \"$NAMESPACE\"" -i $tmpAPIyaml
+			echo "[INFO]kubectl apply -f $tmpAPIyaml -n $NAMESPACE"
+			kubectl apply -f $tmpAPIyaml -n $NAMESPACE
+		fi
+	done
+	rm -f $tmpAPIyaml
 }
 
 # Process commands and take actions
