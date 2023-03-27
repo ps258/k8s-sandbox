@@ -39,7 +39,8 @@ IFS="
 
 for key in $(redis-cli -h $HOST -p $PORT --scan --pattern "$REDIS_KEY_PATTERN" | sort); do
   type=$(redis-cli -h $HOST -p $PORT type $key)
-  echo -n "$key ($type) => "
+  ttl=$(redis-cli -h $HOST -p $PORT ttl $key)
+  echo -n "$key (type:$type) (ttl:$ttl) => "
   case $type in
   list)
 		echo
