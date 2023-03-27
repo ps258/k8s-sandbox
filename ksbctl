@@ -60,23 +60,18 @@ KSBX_MDCB_LICENSE=''
 KSBX_NS=''
 MONGOSHELL=''
 INSTALL_OPR_CONTEXT=false
+BOOTSTRAP=true
 export KSBX_ADMIN_SECRET=admin_secret
 export KSBX_PGPASSWORD=password		# default postgres password
 export KSBX_PGUSER=postgresx			# default postgres username
 export KSBX_PGDB=tyk_analytics		# default postgres database
 export KSBX_CONTROL_GATEWAY_REPLICAS=1		# default number of control gateways to run
 export KSBX_EDGE_GATEWAY_REPLICAS=1		# default number of edge gateways to run
-
-# load env variables
 ENVFILE=~/.tyk-sandbox
-if [[ -f $ENVFILE ]]; then
-	. $ENVFILE
-else
-	SBX_LICENSE=""
-	SBX_MDCB_LICENSE=""
-	SBX_USER=""
-	SBX_PASSWORD=""
-fi
+SBX_LICENSE=""
+SBX_MDCB_LICENSE=""
+SBX_USER=""
+SBX_PASSWORD=""
 
 function help {
 	typeset name
@@ -89,6 +84,7 @@ function help {
 	echo "      -h setup the edge gateways to use https (implies -m and incompatible with -i)"
 	echo "      -i add the istio label to the namespace so istio is injected into the pods"
 	echo "      -m run MDCB and configure edge gateways"
+	echo "      -n done use '$ENVFILE' to bootstrap the install"
 	echo "      -o create OperatorContext for Tyk Operator"
 	echo "      -p deploy with postgres not mongo"
 	echo "      -s deploy a stand alone gateway"
@@ -693,19 +689,21 @@ function publishAPIs {
 		typeset DashboardPort
 		adminKey=$(getAdminUserKey)
 		DashboardPort=$(getDashboardPort)
-		for APIfile in "$@"; do
-			echo "[INFO]Publishing API $APIfile"
-			if grep -q api_definition "$APIfile"; then
-				# deal with the files that are a copy and paste of the API JSON from the dashboard
-				curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d@"$APIfile" > /dev/null
-			else
-				# deal with the files that are exported APIs from the dashboard
-				APIfileName=$(mktemp /tmp/$(basename "$APIfile").XXXXXX)
-				createApiDefintion "$APIfile" > $APIfileName
-				curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d@"$APIfileName" > /dev/null
-				\rm $APIfileName
-			fi
-		done
+		if [[ -n $adminKey ]]; then
+			for APIfile in "$@"; do
+				echo "[INFO]Publishing API $APIfile"
+				if grep -q api_definition "$APIfile"; then
+					# deal with the files that are a copy and paste of the API JSON from the dashboard
+					curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfile"
+				else
+					# deal with the files that are exported APIs from the dashboard
+					APIfileName=$(mktemp /tmp/$(basename "$APIfile").XXXXXX)
+					createApiDefintion "$APIfile" > $APIfileName
+					curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfileName" 
+					\rm $APIfileName
+				fi
+			done
+		fi
 	else
 		# stand alone (ce)
 		typeset gatewaySecret
@@ -808,7 +806,7 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts :c:e:himopst:v: arg; do
+			while getopts :c:e:himnopst:v: arg; do
 				case $arg in
 					c)
 						# the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -819,7 +817,7 @@ if [[ $# -gt 0 ]]; then
 						# the number of edge gateways to deploy (must be combined with -m to deploy MDCB)
 						# defaults to one
 						case $OPTARG in
-							[0-9]* )
+							[0-9]*)
 								KSBX_EDGE_GATEWAY_REPLICAS=$OPTARG
 								;;
 							*)
@@ -842,6 +840,10 @@ if [[ $# -gt 0 ]]; then
 						# deploy with MDCB, edge redis and edge gateways
 						INSTALL_EDGE=true
 						checkMDCBlicence
+						;;
+					n)
+						# don't read ~/.tyk-sandbox and bootstrap
+						BOOTSTRAP=false
 						;;
 					o)
 						# deploy an operator context into the new namespace
@@ -875,6 +877,10 @@ if [[ $# -gt 0 ]]; then
 				esac
 			done
 			NAMESPACE=ksandbox-$(nextFreeNamespace)
+			if [[ $BOOTSTRAP == true && -f $ENVFILE ]]; then
+				# load env variables
+				. $ENVFILE
+			fi
 			if [[ -z $sandboxVersion ]]; then
 				echo "[FATAL]Must specify a sandbox version"
 				help
