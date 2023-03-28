@@ -155,7 +155,7 @@ function getNamespaceNames {
 # there's no way to install the MDCB licence interactively so we must have it up front
 function checkMDCBlicence {
 	if [[ -z $SBX_MDCB_LICENSE ]]; then
-		echo "[FATAl]No MDCB license present in ~/.tyk-sandbox. Please populate with SBX_MDCB_LICENSE=<MDCB LICENSE KEY>"
+		echo "[FATAl]No MDCB license present in $ENVFILE. Please populate with SBX_MDCB_LICENSE=<MDCB LICENSE KEY>"
 		exit 1
 	else
 		export KSBX_MDCB_LICENSE=$SBX_MDCB_LICENSE
@@ -834,15 +834,13 @@ if [[ $# -gt 0 ]]; then
 					h)
 						INSTALL_EDGE=true
 						ENABLE_HTTPS=true
-						checkMDCBlicence
 						;;
 					m)
 						# deploy with MDCB, edge redis and edge gateways
 						INSTALL_EDGE=true
-						checkMDCBlicence
 						;;
 					n)
-						# don't read ~/.tyk-sandbox and bootstrap
+						# don't read ENVFILE (~/.tyk-sandbox) and bootstrap
 						BOOTSTRAP=false
 						;;
 					o)
@@ -877,9 +875,12 @@ if [[ $# -gt 0 ]]; then
 				esac
 			done
 			NAMESPACE=ksandbox-$(nextFreeNamespace)
-			if [[ $BOOTSTRAP == true && -f $ENVFILE ]]; then
+			if [[ $BOOTSTRAP == 'true' && -f $ENVFILE ]]; then
 				# load env variables
 				. $ENVFILE
+			fi
+			if [[ $INSTALL_EDGE == 'true' ]]; then
+				checkMDCBlicence
 			fi
 			if [[ -z $sandboxVersion ]]; then
 				echo "[FATAL]Must specify a sandbox version"
