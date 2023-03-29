@@ -84,7 +84,7 @@ function help {
 	echo "      -h setup the edge gateways to use https (implies -m and incompatible with -i)"
 	echo "      -i add the istio label to the namespace so istio is injected into the pods"
 	echo "      -m run MDCB and configure edge gateways"
-	echo "      -n done use '$ENVFILE' to bootstrap the install"
+	echo "      -n don't use '$ENVFILE' to bootstrap the install"
 	echo "      -o create OperatorContext for Tyk Operator"
 	echo "      -p deploy with postgres not mongo"
 	echo "      -s deploy a stand alone gateway"
