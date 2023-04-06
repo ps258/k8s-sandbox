@@ -234,7 +234,7 @@ function startMinikube {
 	fi
 }
 
-function setupOperator {
+function setupHelmAndOperator {
 	# sleep is needed or the cert manager will refuse connection and the install will fail
 	# if this is run too soon after an init it will fail because things are too busy
 	if which helm > /dev/null 2>&1; then
@@ -1209,7 +1209,7 @@ if [[ $# -gt 0 ]]; then
 			fi
 			case $1 in
 				operator)
-					setupOperator
+					setupHelmAndOperator
 					;;
 				istio)
 					setupIstio
