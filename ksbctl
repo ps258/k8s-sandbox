@@ -143,8 +143,12 @@ function getNamespaceNames {
 	typeset namespace
 	namespaces=""
 	for namespace in $*; do
-		if ! echo $namespace | grep -q ksandbox- ; then
-			namespaces="$namespaces ksandbox-$namespace"
+		if ! namespaceExists $namespace; then
+			if ! echo $namespace | grep -q ksandbox- ; then
+				namespaces="$namespaces ksandbox-$namespace"
+			else
+				namespaces="$namespaces $namespace"
+			fi
 		else
 			namespaces="$namespaces $namespace"
 		fi
@@ -222,7 +226,7 @@ function startMinikube {
 		if ! minikube status > /dev/null 2>&1 ;then
 			echo "[INFO]Starting minikube"
 			# check for command dependencies
-			minikube start --driver docker --cpus max --memory max --docker-opt="default-ulimit=nofile=102400:102400"
+			minikube start --driver docker --cpus max --memory max --docker-opt="default-ulimit=nofile=204800:204800"
 			minikube addons enable metrics-server
 			# give it a few seconds to settle down
 			sleep 5
@@ -462,9 +466,11 @@ function createNamespace {
 }
 
 function namespaceExists {
+	typeset namespace
 	typeset ns
+	namespace="$1"
 	for ns in $(kubectl get namespaces --no-headers=true | awk '{print $1}'); do
-		if [[ "$ns" == $NAMESPACE ]]; then
+		if [[ "$ns" == $namespace ]]; then
 			return 0
 		fi
 	done
@@ -813,7 +819,7 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts :c:e:himnopst:v: arg; do
+			while getopts :c:e:himN:nopst:v: arg; do
 				case $arg in
 					c)
 						# the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -845,6 +851,10 @@ if [[ $# -gt 0 ]]; then
 					m)
 						# deploy with MDCB, edge redis and edge gateways
 						INSTALL_EDGE=true
+						;;
+					N)
+						# specify a particular namespace
+						NAMESPACE=$OPTARG
 						;;
 					n)
 						# don't read ENVFILE (~/.tyk-sandbox) and bootstrap
@@ -881,7 +891,9 @@ if [[ $# -gt 0 ]]; then
 						;;
 				esac
 			done
-			NAMESPACE=ksandbox-$(nextFreeNamespace)
+			if [[ -z $NAMESPACE ]]; then
+				NAMESPACE=ksandbox-$(nextFreeNamespace)
+			fi
 			if [[ $BOOTSTRAP == 'true' && -f $ENVFILE ]]; then
 				# load env variables
 				. $ENVFILE
