@@ -591,6 +591,7 @@ function runShell {
 			echo "[INFO]Checking for ncurses-base in $pod"
 			if ! kubectl exec $pod -n $NAMESPACE -- test -d /lib/terminfo >/dev/null 2>&1; then
 				echo "[INFO]Installing ncurses-base to provide terminal types to the shell"
+				kubectl exec $pod -n $NAMESPACE -- apt-get update > /dev/null 2>&1
 				kubectl exec $pod -n $NAMESPACE -- apt install ncurses-base -y > /dev/null 2>&1
 			fi
 			echo "[INFO]starting bash in $pod"
