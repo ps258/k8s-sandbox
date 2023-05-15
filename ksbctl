@@ -72,6 +72,7 @@ SBX_LICENSE=""
 SBX_MDCB_LICENSE=""
 SBX_USER=""
 SBX_PASSWORD=""
+PUBLISH_APIS=true
 
 function help {
 	typeset name
@@ -79,8 +80,9 @@ function help {
 	echo "[USAGE]:"
 	echo "$name create -v <tyk version> -t <namespace description> -N <namespace name> [-p|-s] [-c gateway_count] [-e edge_gw_count] [-m] [-o] [-i]"
 	echo "      Create a tyk instance in a namespace sandbox with the version given as a tag with -v"
-	echo "      -e the number of edge gateway replicas to run"
 	echo "      -c the number of control plane gateway replicas to run"
+	echo "      -d don't publish any sample APIs"
+	echo "      -e the number of edge gateway replicas to run"
 	echo "      -h setup the edge gateways to use https (implies -m and incompatible with -i)"
 	echo "      -i add the istio label to the namespace so istio is injected into the pods"
 	echo "      -m run MDCB and configure edge gateways"
@@ -479,6 +481,47 @@ function namespaceExists {
 	return 1
 }
 
+function CrdExists {
+	typeset namespace
+	typeset CRD
+	typeset CrdCount
+	namespace="$1"
+	CRD=$2
+	CrdCount=0
+	if kubectl get crd -n $namespace --no-headers=true | grep -q "$CRD"; then
+		if [[ $(kubectl get $CRD -n $namespace --no-headers=true 2>&- | wc -l) -gt 0 ]]
+		then
+			return 0
+		fi
+	fi
+	return 1
+}
+
+function SecurityPoliciesExist {
+	if CrdExists $1 securitypolicies.tyk.tyk.io
+	then
+		return 0
+	fi
+	return 1
+}
+
+function ApiDefinitionsExist {
+	if CrdExists $1 apidefinitions.tyk.tyk.io
+  then
+    return 0
+  fi
+  return 1
+}
+
+function OperatorContextExists {
+  if CrdExists $1 operatorcontexts.tyk.tyk.io
+  then
+    return 0
+  fi
+  return 1
+}
+
+
 # Process the YAML with envsubst to substitute environment variables into them
 # All exported environment varables are available to envsubst but these are the main ones
 # KSBX_GATE_VERS which has the gateway version. This is used to pull the gateway docker image
@@ -822,12 +865,16 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts :c:e:himN:nopst:v: arg; do
+			while getopts :c:de:himN:nopst:v: arg; do
 				case $arg in
 					c)
 						# the number of control gateways to deploy (these are also just gateways in the pro install)
 						# defaults to one
 						KSBX_CONTROL_GATEWAY_REPLICAS=$OPTARG
+						;;
+					d)
+						# Don't publish any APIs
+						PUBLISH_APIS=false
 						;;
 					e)
 						# the number of edge gateways to deploy (must be combined with -m to deploy MDCB)
@@ -1003,11 +1050,13 @@ if [[ $# -gt 0 ]]; then
 						waitDeploymentReady edge-gateway
 						applyYAMLtemplate tyk-gateway-svc-edge.yaml
 					fi
-					if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
-						publishAPIs $SCRIPTDIR/APIs/*.json
-					else
-						deployOperatorContext
-						deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
+					if [[ $PUBLISH_APIS == 'true' ]]; then
+						if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
+							publishAPIs $SCRIPTDIR/APIs/*.json
+						else
+							deployOperatorContext
+							deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
+						fi
 					fi
 					listPods
 					reportSanboxInfo 
@@ -1021,11 +1070,13 @@ if [[ $# -gt 0 ]]; then
 					applyYAMLtemplate tyk-gateway-standalone.yaml
 					applyYAMLtemplate tyk-gateway-svc-standalone.yaml
 					waitDeploymentReady standalone-gateway
-					if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
-						publishAPIs $SCRIPTDIR/APIs/*.json
-					else
-						deployOperatorContext
-						deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
+					if [[ $PUBLISH_APIS == 'true' ]]; then
+						if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
+							publishAPIs $SCRIPTDIR/APIs/*.json
+						else
+							deployOperatorContext
+							deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
+						fi
 					fi
 					listPods
 					reportSanboxInfo 
@@ -1047,18 +1098,25 @@ if [[ $# -gt 0 ]]; then
 				if namespaceExists $NAMESPACE; then
 					echo "[INFO]Deleting Namespace $NAMESPACE"
 					# clean up the policies first
-					echo "[INFO]Deleting SecurityPolicies from $NAMESPACE"
-					echo "[INFO]kubectl delete SecurityPolicy --all -n $NAMESPACE"
-					kubectl delete SecurityPolicy --all -n $NAMESPACE
+					if SecurityPoliciesExist $NAMESPACE; then
+						echo "[INFO]Deleting SecurityPolicies from $NAMESPACE"
+						echo "[INFO]kubectl delete SecurityPolicy --all -n $NAMESPACE"
+						kubectl delete SecurityPolicy --all -n $NAMESPACE
+					fi
 					# clean up the APIs first
-					echo "[INFO]Deleting ApiDefinitions from $NAMESPACE"
-					echo "[INFO]kubectl delete ApiDefinition --all -n $NAMESPACE"
-					kubectl delete ApiDefinition --all -n $NAMESPACE
-					echo "[INFO]Deleting OperatorContext from $NAMESPACE"
-					echo "[INFO]kubectl delete OperatorContext --all -n $NAMESPACE"
-					kubectl delete OperatorContext --all -n $NAMESPACE
-					echo "[INFO]kubectl delete namespace $NAMESPACE --wait"
+					if ApiDefinitionsExist $NAMESPACE; then
+						echo "[INFO]Deleting ApiDefinitions from $NAMESPACE"
+						echo "[INFO]kubectl delete ApiDefinition --all -n $NAMESPACE"
+						kubectl delete ApiDefinition --all -n $NAMESPACE
+					fi
+					if OperatorContextExists $NAMESPACE ]]; then
+						echo "[INFO]Deleting OperatorContext from $NAMESPACE"
+						echo "[INFO]kubectl delete OperatorContext --all -n $NAMESPACE"
+						kubectl delete OperatorContext --all -n $NAMESPACE
+						echo "[INFO]kubectl delete namespace $NAMESPACE --wait"
+					fi
 					kubectl delete namespace $NAMESPACE --wait
+					set +x
 				fi
 			done
 			tidyPVCs
