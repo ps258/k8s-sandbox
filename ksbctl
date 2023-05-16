@@ -1050,11 +1050,13 @@ if [[ $# -gt 0 ]]; then
 						waitDeploymentReady edge-gateway
 						applyYAMLtemplate tyk-gateway-svc-edge.yaml
 					fi
+					if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
+							deployOperatorContext
+				  fi
 					if [[ $PUBLISH_APIS == 'true' ]]; then
 						if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
 							publishAPIs $SCRIPTDIR/APIs/*.json
 						else
-							deployOperatorContext
 							deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
 						fi
 					fi
@@ -1070,11 +1072,13 @@ if [[ $# -gt 0 ]]; then
 					applyYAMLtemplate tyk-gateway-standalone.yaml
 					applyYAMLtemplate tyk-gateway-svc-standalone.yaml
 					waitDeploymentReady standalone-gateway
+					if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
+							deployOperatorContext
+				  fi
 					if [[ $PUBLISH_APIS == 'true' ]]; then
 						if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
 							publishAPIs $SCRIPTDIR/APIs/*.json
 						else
-							deployOperatorContext
 							deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
 						fi
 					fi
