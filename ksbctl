@@ -385,6 +385,10 @@ function getControlGatewayPort {
 	kubectl get svc -n $NAMESPACE control-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
+function getMDCBPort {
+	kubectl get svc -n $NAMESPACE tyk-sink --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
 function getEdgeGatewayPort {
 	kubectl get svc -n $NAMESPACE edge-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
@@ -394,12 +398,19 @@ function getStandaloneGatewayPort {
 }
 
 function reportSanboxInfo {
+	typeset https
 	echo "$NAMESPACE.Description:       $(getDescription)"
 	if [[ $KSBX_TYPE == 'pro'  || $KSBX_TYPE == 'mdcb' ]]; then
 		echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
 		echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
 		if [[ $KSBX_TYPE == "mdcb" ]]; then
-			echo "$NAMESPACE.edge-gateway:      http://$IP:$(getEdgeGatewayPort)/"
+			echo "$NAMESPACE.MDCBport:          $IP:$(getMDCBPort)"
+			https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
+			if [[ $https == 'true' ]]; then
+				echo "$NAMESPACE.edge-gateway:      https://$IP:$(getEdgeGatewayPort)/"
+			else
+				echo "$NAMESPACE.edge-gateway:      http://$IP:$(getEdgeGatewayPort)/"
+			fi
 		fi
 		if [[ $KSBX_DATABASE == 'mongo' ]]; then
 			checkMongoShellInstalled
@@ -683,9 +694,11 @@ function enableEdgeHttps {
 	echo "[INFO]Deploying self signed certificate to the edge gateway"
 	DASH_URL=http://$IP:$(getDashboardPort)
 	adminKey=$(getAdminUserKey)
+	# add a label to the deployment to show that it's https
+	kubectl label deployment edge-gateway https=true -n $NAMESPACE
 	# generate the edge gateway certificate
 	SAN="DNS:localhost, DNS:*.$NAMESPACE.svc.cluster.local"
-	SUBJECT='/emailAddress=email@company.com/C=GB/ST=Mid Lothian/L=Home Office/O=Garage/OU=Desk/CN=tyk-sandbox.com'
+	SUBJECT="/emailAddress=email@company.com/C=GB/ST=K8s Sandbox/L=$(date +"%Y-%b-%d %T %Z")/O=Support/OU=Team/CN=$NAMESPACE"
 	GW_KEY_FILE=$(mktemp /tmp/XXXXX-gateway-key.pem)
 	GW_CRT_FILE=$(mktemp /tmp/XXXXX-gateway-certificate.pem)
 	GW_CSR_FILE=$(mktemp /tmp/XXXXX-certificate.csr)
