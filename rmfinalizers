@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# script to delete all ApiDefinition and OperatorContexts from a namespace.
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
+
+if [[ $# -lt 1 ]]; then
+	echo "[FATAL]Must provide namespace"
+	exit 1
+fi
+
+typeset API
+typeset OC
+for NAMESPACE in $*; do
+	# now delete API definitions
+	echo "[INFO]Deleting ApiDefinitions from $NAMESPACE"
+	for API in $(kubectl get ApiDefinition -n $NAMESPACE --no-headers=true | awk '{print $1}'); do
+		#kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
+		kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers)' | kubectl apply -f -
+	done
+	# delete OperatorContext finalizer since it can hang too
+	sleep 1
+	for OC in $(kubectl get OperatorContext -n $NAMESPACE --no-headers=true | awk '{print $1}'); do
+		#kubectl get OperatorContext $OC -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
+		kubectl get OperatorContext $OC -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers)' | kubectl apply -f -
+	done
+	kubectl delete ApiDefinition --all -n $NAMESPACE
+	kubectl delete OperatorContext --all -n $NAMESPACE
+	# now check results
+	echo "[INFO]Checking ApiDefinitions from $NAMESPACE to see if the finalizer is gone"
+	for API in $(kubectl get ApiDefinition -n $NAMESPACE --no-headers=true | awk '{print $1}'); do
+		echo API=$API $(kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq .metadata.finalizers)
+	done
+	echo "[INFO]Checking OperatorContext from $NAMESPACE to see if the finalizer is gone"
+	for OC in $(kubectl get OperatorContext -n $NAMESPACE --no-headers=true | awk '{print $1}'); do
+		echo OC=$OC $(kubectl get OperatorContext $OC -n $NAMESPACE -o yaml | yq .metadata.finalizers)
+	done
+done
