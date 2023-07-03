@@ -127,6 +127,10 @@ function help {
 	echo "      Start the minikube cluster if it's not running"
 }
 
+function getAllSandboxes {
+	kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL --no-headers=true 2>/dev/null | awk '{print $1}' | xargs
+}
+
 # find the next namespace index that's unused
 function nextFreeNamespace {
 	typeset existing
@@ -1133,7 +1137,6 @@ if [[ $# -gt 0 ]]; then
 						echo "[INFO]kubectl delete namespace $NAMESPACE --wait"
 					fi
 					kubectl delete namespace $NAMESPACE --wait
-					set +x
 				fi
 			done
 			tidyPVCs
@@ -1144,8 +1147,8 @@ if [[ $# -gt 0 ]]; then
 		info)
 			shift
 			if [[ $# -lt 1 ]]; then
-				echo "[FATAL]Must provide namespace"
-				exit 1
+				# give info on all if none given
+				set $(getAllSandboxes)
 			fi
 			for NAMESPACE in $(getNamespaceNames $*); do
 				if namespaceExists $NAMESPACE; then
@@ -1157,6 +1160,7 @@ if [[ $# -gt 0 ]]; then
 					showTykVersions
 					listPods
 					reportSanboxInfo
+					echo
 				else
 					echo "[WARN]Namespace '$NAMESPACE' not found"
 				fi
@@ -1265,13 +1269,14 @@ if [[ $# -gt 0 ]]; then
 		pods)
 			shift
 			if [[ $# -lt 1 ]]; then
-				echo "[FATAL]Must provide namespace"
-				exit 1
+				# give info on all if none given
+				set $(getAllSandboxes)
 			fi
 			for NAMESPACE in $(getNamespaceNames $*); do
 				if namespaceExists $NAMESPACE; then
 					echo "[INFO]$NAMESPACE"
 					listPods
+					echo
 				else
 					echo "[FATAL]No such ksandbox: $NAMESPACE"
 				fi
