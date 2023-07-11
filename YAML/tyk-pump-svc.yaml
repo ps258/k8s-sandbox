@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: tyk-pump
+  labels:
+    app: tyk-pump
+    plane: control
+spec:
+  ports:
+  - port: 8083
+    protocol: TCP
+    targetPort: 8083
+  type: NodePort
+  selector:
+    app: tyk-pump
+    plane: control
