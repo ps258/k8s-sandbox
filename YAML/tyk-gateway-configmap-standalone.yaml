@@ -67,7 +67,7 @@ data:
       "pid_file_location": "/opt/tyk-gateway/tyk-gateway.pid",
       "policies": {
         "policy_source": "file",
-        "policy_record_name": "/opt/tyk-gateway/policies/policies.json"
+        "policy_path": "/opt/tyk-gateway/policies/"
       },
       "proxy_ssl_insecure_skip_verify": true,
       "secret": "Secret",
