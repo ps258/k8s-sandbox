@@ -233,8 +233,7 @@ function startMinikube {
 	if which minikube > /dev/null 2>&1 ; then
 		if ! minikube status > /dev/null 2>&1 ;then
 			echo "[INFO]Starting minikube"
-			# check for command dependencies
-			minikube start --driver docker --cpus max --memory max --docker-opt="default-ulimit=nofile=204800:204800"
+			minikube start --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
 			minikube addons enable metrics-server
 			# give it a few seconds to settle down
 			sleep 5
