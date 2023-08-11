@@ -22,8 +22,8 @@ data:
       },
       "server_options": {
         "certificate": {
-          "cert_file": "<path>",
-          "key_file": "<path>"
+          "cert_file": "",
+          "key_file": ""
         },
         "min_version": 771,
         "use_ssl": false
