@@ -111,7 +111,7 @@ function help {
 	echo "      -v rollout the named version into the pods. No checking of the version is done"
 	echo "         so make sure it's right"
 	echo "$name monitor <sandbox namespace> <pod name>"
-	echo "      Print CPU and memory usage for the containers in the pod ever $POD_MONITOR_FREQ seconds"
+	echo "      Print CPU and memory usage for the containers in the pod every $POD_MONITOR_FREQ seconds"
 	echo "$name pods <sandbox namespace...>"
 	echo "      List pods in namespace"
 	echo "$name publish <sandbox namespace> <api.json ...>"
