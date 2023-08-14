@@ -94,8 +94,10 @@ data:
         "connection_string": "tyk-sink:9090",
         "enable_rpc_cache": true,
         "group_id": "edge",
+        "key_space_sync_interval": 10,
         "rpc_key": "$KSBX_ORG_ID",
         "ssl_insecure_skip_verify": true,
+        "synchroniser_enabled": true,
         "use_rpc": true,
         "use_ssl": false
       },

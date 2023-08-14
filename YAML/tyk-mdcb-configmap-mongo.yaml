@@ -33,5 +33,9 @@ data:
         "host": "control-redis",
         "port": 6379,
         "type": "redis"
+      },
+      "sync_worker_config": {
+        "enabled": true,
+        "hash_keys": false
       }
     }
