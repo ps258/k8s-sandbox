@@ -145,6 +145,30 @@ function nextFreeNamespace {
 	done
 }
 
+# Check if a deployment exists with a partial name
+function deploymentExists {
+	typeset deployment
+	deployment=$1
+	if [[ $(kubectl get deployment --no-headers=true -n $NAMESPACE | grep $deployment | wc -l) -gt 0 ]]; then
+		if [[ $(kubectl get deployment --no-headers=true -n $NAMESPACE | grep $deployment | wc -l) -gt 1 ]]; then
+			echo "[FATAL]More than one deployment matches:"
+			kubectl get deployment --no-headers=true -n $NAMESPACE | awk '/'$deployment'/ {print $1}' 1>&2
+			return 1
+		fi
+	else
+		echo "[FATAL]No deployments match '$deployment'"
+		return 1
+	fi
+	return 0
+}
+
+# return a deployment name from partial match
+function getDeploymentName {
+	typeset deployment
+	deployment=$1
+	echo $(kubectl get deployment --no-headers=true -n $NAMESPACE | awk '/'$deployment'/ {print $1}')
+}
+
 # allow the shortcut of using 1 to mean ksandbox-1 on the commandline
 function getNamespaceNames {
 	typeset namespaces
@@ -1194,7 +1218,10 @@ if [[ $# -gt 0 ]]; then
 			NAMESPACE=$(getNamespaceNames $1)
 			shift
 			typeset deploymentName
-			deploymentName=$1
+			if ! deploymentExists $1; then
+				exit 1
+			fi
+			deploymentName=$(getDeploymentName $1)
 			shift
 			typeset newPodCount; typeset newPodVersion
 			newPodCount=''; newPodVersion=''
