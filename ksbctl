@@ -227,13 +227,23 @@ function checkMongoShellInstalled {
 	fi
 }
 
+function getActiveKubectlContext {
+	kubectl config get-contexts --no-headers=true | awk '/\*/ {print $3}'
+}
+
+function getMinikubeIP {
+	typeset activeContext
+	activeContext=$(getActiveKubectlContext)
+	minikube profile list -l | awk '/'$activeContext'/ {print $8}'
+}
+
 # checks done to setup env on every run
 function setGlobals {
 	checkCommandInstalled redis-cli jq envsubst psql yq
 	if which minikube > /dev/null 2>&1 ; then
-		alias kubectl="minikube kubectl -- "
+		#alias kubectl="minikube kubectl -- "
 		# check for command dependencies
-		IP=$(minikube ip)
+		IP=$(getMinikubeIP)
 	else
 		# attempt to find a local IP to use. This won't help with a remote K8s cluster
 		IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
