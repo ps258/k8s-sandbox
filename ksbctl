@@ -1,4 +1,4 @@
-#!/bin/ksh -u
+#!/bin/ksh
 
 # command to manage tyk instances in distinct namespaces
 
@@ -32,10 +32,20 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #     share plugin folders with sbctl
 #			python/lua
 
-if [[ -n $KSBCTL_CLUSTER ]]; then
-	CLUSTER=$KSBCTL_CLUSTER
+# check for -C option to specify the cluster
+if [[ $# -ge 2 ]]; then
+	if [[ $1 == '-C' ]]; then
+		CLUSTER=$2
+		shift; shift
+	fi
+fi
+
+if [[ -z $KSBCTL_CLUSTER ]]; then
+	if [[ -z $CLUSTER ]]; then
+		CLUSTER=minikube
+	fi
 else
-	CLUSTER=minikube
+	CLUSTER=$KSBCTL_CLUSTER
 fi
 alias kubectl="kubectl --cluster=$CLUSTER"
 
@@ -45,6 +55,7 @@ SCRIPTDIR=$(
 	cd "$(dirname $SCRIPTNAME)"
 	echo $PWD
 )
+
 VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
 YAMLDIR="$SCRIPTDIR/YAML"
 NAMESPACE_SELECTOR_LABEL="creator=ksbctl"
@@ -254,8 +265,8 @@ function setGlobals {
 # copy "$SCRIPTDIR/etc/tmp.conf" into minikube so that permanent volumes can be created
 function setupMinikube {
 	if which minikube > /dev/null 2>&1 ; then
-		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ;then
-			echo "[INFO]Configuring minikube to enable permanent volumes for databases"
+		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ; then
+			echo "[INFO]Configuring minikube cluster '$CLUSTER' to enable permanent volumes for databases"
 			minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
 		fi
 	else
@@ -266,7 +277,7 @@ function setupMinikube {
 # start minikube if it's not already running
 function startMinikube {
 	if which minikube > /dev/null 2>&1 ; then
-		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ;then
+		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ; then
 			echo "[INFO]Starting minikube"
 			minikube start -p $CLUSTER --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
 			minikube profile $CLUSTER
@@ -274,7 +285,7 @@ function startMinikube {
 			# give it a few seconds to settle down
 			sleep 5
 		else
-			echo "[WARN]Minikube already running. Not starting it again"
+			echo "[WARN]Minikube cluster '$CLUSTER' is already running. Not starting it again"
 		fi
 	else
 		echo "[WARN]Minikube not installed. Cannot start"
@@ -557,18 +568,18 @@ function SecurityPoliciesExist {
 
 function ApiDefinitionsExist {
 	if CrdExists $1 apidefinitions.tyk.tyk.io
-  then
-    return 0
-  fi
-  return 1
+	then
+		return 0
+	fi
+	return 1
 }
 
 function OperatorContextExists {
-  if CrdExists $1 operatorcontexts.tyk.tyk.io
-  then
-    return 0
-  fi
-  return 1
+	if CrdExists $1 operatorcontexts.tyk.tyk.io
+	then
+		return 0
+	fi
+	return 1
 }
 
 
