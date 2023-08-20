@@ -32,6 +32,13 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #     share plugin folders with sbctl
 #			python/lua
 
+if [[ -n $KSBCTL_CLUSTER ]]; then
+	CLUSTER=$KSBCTL_CLUSTER
+else
+	CLUSTER=minikube
+fi
+alias kubectl="kubectl --cluster=$CLUSTER"
+
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
 SCRIPTDIR=$(
@@ -227,14 +234,8 @@ function checkMongoShellInstalled {
 	fi
 }
 
-function getActiveKubectlContext {
-	kubectl config get-contexts --no-headers=true | awk '/\*/ {print $3}'
-}
-
 function getMinikubeIP {
-	typeset activeContext
-	activeContext=$(getActiveKubectlContext)
-	minikube profile list -l | awk '/'$activeContext'/ {print $8}'
+	minikube profile list -l | awk '/'$CLUSTER'/ {print $8}'
 }
 
 # checks done to setup env on every run
@@ -251,9 +252,9 @@ function setGlobals {
 }
 
 # copy "$SCRIPTDIR/etc/tmp.conf" into minikube so that permanent volumes can be created
-function initMinikube {
+function setupMinikube {
 	if which minikube > /dev/null 2>&1 ; then
-		if ! minikube status > /dev/null 2>&1 ;then
+		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ;then
 			echo "[INFO]Configuring minikube to enable permanent volumes for databases"
 			minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
 		fi
@@ -265,9 +266,10 @@ function initMinikube {
 # start minikube if it's not already running
 function startMinikube {
 	if which minikube > /dev/null 2>&1 ; then
-		if ! minikube status > /dev/null 2>&1 ;then
+		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ;then
 			echo "[INFO]Starting minikube"
-			minikube start --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
+			minikube start -p $CLUSTER --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
+			minikube profile $CLUSTER
 			minikube addons enable metrics-server
 			# give it a few seconds to settle down
 			sleep 5
@@ -1201,7 +1203,7 @@ if [[ $# -gt 0 ]]; then
 			;;
 		init)
 			startMinikube
-			initMinikube
+			setupMinikube
 			;;
 		list)
 			echo "[INFO]kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL"
