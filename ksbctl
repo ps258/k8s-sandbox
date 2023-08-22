@@ -11,26 +11,12 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #  mongosh to retrieve things from mongodb (what?)
 #  redis-cli to retrieve admin credentials
 
-# todo: 
-#		(done) Use volumes to hold persistent data
-#			(done) Mongodb
-#				https://github.com/kubernetes/minikube/issues/7511#issuecomment-1022222474
-#				add to /etc/tmpfiles.d/tmp.conf
-#  				-D /tmp 1777 root root -
-#					+d /tmp 1777 root root 1s
-#					+x /tmp/hostpath-provisioner/*
-#			Set versions for mdcb, mongo/redis and postgresql too
-#			Allow commandline override of versions of all components
-#		test on other platforms
-#			(done) windows
-#			(done) MacOS
-#				M1
-#		(done) deploy with MDCB
-#		create way to deploy plugins
-#			bundle server
-#			golang
-#     share plugin folders with sbctl
-#			python/lua
+# it may be necessary to increase some limits when running many pods or multiple clusters
+# This worked for me but YMMV
+#  sysctl -w fs.inotify.max_user_watches=2099999999
+#  sysctl -w fs.inotify.max_user_instances=2099999999
+#  sysctl -w fs.inotify.max_queued_events=2099999999
+
 
 # check for -C option to specify the cluster
 if [[ $# -ge 2 ]]; then
@@ -245,8 +231,16 @@ function checkMongoShellInstalled {
 	fi
 }
 
+function minikubeProfileExists  {
+	if minikube profile list 2> /dev/null | grep -qw $CLUSTER; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 function getMinikubeIP {
-	minikube profile list -l | awk '/'$CLUSTER'/ {print $8}'
+	minikube profile list -l 2> /dev/null | awk '/'$CLUSTER'/ {print $8}'
 }
 
 # checks done to setup env on every run
@@ -278,7 +272,7 @@ function setupMinikube {
 function startMinikube {
 	if which minikube > /dev/null 2>&1 ; then
 		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ; then
-			echo "[INFO]Starting minikube"
+			echo "[INFO]Starting minikube cluster '$CLUSTER'"
 			minikube start -p $CLUSTER --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
 			minikube profile $CLUSTER
 			minikube addons enable metrics-server
@@ -923,6 +917,13 @@ function deployCRDAPIs {
 
 # Process commands and take actions
 if [[ $# -gt 0 ]]; then
+	if ! minikubeProfileExists ; then
+		if [[ $1 != 'init' ]]; then
+			echo "[FATAL]Minikube cluster '$CLUSTER' not initialised"
+			minikube profile list 2>/dev/null
+			exit 1
+		fi
+	fi
 	# setup global aliases and variables
 	setGlobals
 	case $1 in 
