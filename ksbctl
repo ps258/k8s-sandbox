@@ -257,7 +257,7 @@ function setGlobals {
 }
 
 # copy "$SCRIPTDIR/etc/tmp.conf" into minikube so that permanent volumes can be created
-function setupMinikube {
+function setupMinikubeStorage {
 	if which minikube > /dev/null 2>&1 ; then
 		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ; then
 			echo "[INFO]Configuring minikube cluster '$CLUSTER' to enable permanent volumes for databases"
@@ -268,8 +268,21 @@ function setupMinikube {
 	fi
 }
 
-# start minikube if it's not already running
 function startMinikube {
+	if minikubeProfileExists; then
+		if [[ $(minikube profile list | awk '/'$CLUSTER'/ {print $14}') = 'Stopped' ]]; then
+			minikube start -p $CLUSTER
+		else
+			echo "[WARN]Minikube cluser '$CLUSTER' is already running"
+		fi
+	else
+		echo "[FATAL]Minikube profile '$CLUSTER' does not exist. Use '$SCRIPTNAME -C $CLUSTER init' to create it"
+	fi
+}
+
+
+# start minikube if it's not already running
+function setupMinikube {
 	if which minikube > /dev/null 2>&1 ; then
 		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ; then
 			echo "[INFO]Starting minikube cluster '$CLUSTER'"
@@ -1214,8 +1227,8 @@ if [[ $# -gt 0 ]]; then
 			done
 			;;
 		init)
-			startMinikube
 			setupMinikube
+			setupMinikubeStorage
 			;;
 		list)
 			echo "[INFO]kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL"
