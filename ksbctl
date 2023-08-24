@@ -289,6 +289,7 @@ function setupMinikube {
 			minikube start -p $CLUSTER --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
 			minikube profile $CLUSTER
 			minikube addons enable metrics-server
+			minikube addons enable dashboard
 			# give it a few seconds to settle down
 			sleep 5
 		else
