@@ -303,6 +303,12 @@ function setupMinikube {
 function setupHelmAndOperator {
 	# sleep is needed or the cert manager will refuse connection and the install will fail
 	# if this is run too soon after an init it will fail because things are too busy
+	typeset operatorVersion
+	if [[ -z $KSBX_OPERATOR_VERSION ]]; then
+		operatorVersion=" "
+	else
+		operatorVersion="--version $KSBX_OPERATOR_VERSION"
+	fi
 	if which helm > /dev/null 2>&1; then
 		kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.8.0/cert-manager.yaml --wait
 		echo "[INFO]Sleeping for 30 seconds to allow the cert-manager to start, be patient"
@@ -313,7 +319,7 @@ function setupHelmAndOperator {
 		helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
 		helm repo update
 		echo "[INFO]Attempting to deploy operator using helm. This may take a while"
-		if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system --atomic ; then
+		if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system --atomic  $operatorVersion; then
 			echo "[WARN]Operator install failed. Retrying, but only once"
 			kubectl delete ns tyk-operator-system --wait
 			kubectl create namespace tyk-operator-system
@@ -321,10 +327,14 @@ function setupHelmAndOperator {
 			kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true"
 			sleep 10
 			echo "[INFO]Reattempting to deploy operator using helm. This may take a while"
-			if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system; then
+			if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system $operatorVersion; then
 				echo "[FATAL]Unable to deploy operator after two attempts, giving up"
 				exit 1
 			fi
+		fi
+		# successfully installed, show the version
+		if [[ $(helm list -n tyk-operator-system 2> /dev/null | awk '$1=="tyk-operator" {print $8}') = 'deployed' ]]; then
+			echo "[INFO]Version of the operator chart installed is $(helm list -n tyk-operator-system 2>/dev/null | awk '/tyk-operator/ {print $NF}')"
 		fi
 	else
 		echo "[FATAL]Helm not installed. Please install helm and retry"
