@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-redis
+  labels:
+    app: redis
+    plane: control
+spec:
+  ports:
+  - port: 6379
+    protocol: TCP
+    targetPort: 6379
+  type: NodePort
+  selector:
+    app: redis
+    plane: control

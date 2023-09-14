@@ -1090,12 +1090,16 @@ if [[ $# -gt 0 ]]; then
 					createNamespace
 					if [[ $KSBX_DATABASE == 'mongo' ]]; then
 						echo "[INFO]Starting redis and mongo in the control plane"
-						applyYAMLtemplate mongo.yaml control-redis.yaml # grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
+						applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
+						applyYAMLtemplate mongo-PersistentVolumeClaim.yaml mongo-deployment.yaml mongo-svc.yaml
+						# applyYAMLtemplate grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
 						waitDeploymentReady control-redis
 						waitDeploymentReady mongo-db
 					elif [[ $KSBX_DATABASE == 'postgres' ]]; then
 						echo "[INFO]Starting redis and postgres in the control plane"
-						applyYAMLtemplate postgres.yaml control-redis.yaml # grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
+						applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
+						applyYAMLtemplate postgres.yaml
+						# applyYAMLtemplate grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
 						waitDeploymentReady control-redis
 						waitDeploymentReady postgres-db
 					fi

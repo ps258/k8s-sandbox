@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-redis
+  labels:
+    app: redis
+    plane: control
+spec:
+  selector:
+    matchLabels:
+      app: redis
+      plane: control
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: redis
+        plane: control
+    spec:
+      volumes:
+        - name: control-redis-vol
+          persistentVolumeClaim:
+            claimName: ${KSBX_NS}-control-redis-pvc
+      containers:
+      - name: master
+        image: redis:5.0.3
+        command: ["redis-server", "--save 10 1"]
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+          - mountPath: /data
+            name: control-redis-vol
