@@ -77,6 +77,7 @@ SBX_MDCB_LICENSE=""
 SBX_USER=""
 SBX_PASSWORD=""
 PUBLISH_APIS=true
+ENV_VAR_FILE=""
 
 function help {
 	typeset name
@@ -84,20 +85,21 @@ function help {
 	echo "[USAGE]:"
 	echo "$name create -v <tyk version> -t <namespace description> -N <namespace name> [-p|-s] [-c gateway_count] [-e edge_gw_count] [-m] [-o] [-i]"
 	echo "      Create a tyk instance in a namespace sandbox with the version given as a tag with -v"
-	echo "      -c the number of control plane gateway replicas to run"
-	echo "      -d don't publish any sample APIs"
-	echo "      -e the number of edge gateway replicas to run"
-	echo "      -h setup the edge gateways to use https (implies -m and incompatible with -i)"
-	echo "      -i add the istio label to the namespace so istio is injected into the pods"
-	echo "      -m run MDCB and configure edge gateways"
+	echo "      -c The number of control plane gateway replicas to run"
+	echo "      -d Don't publish any sample APIs"
+	echo "      -e The number of edge gateway replicas to run"
+	echo "      -E A file to read environment variables from and add them all deployments"
+	echo "      -h Setup the edge gateways to use https (implies -m and incompatible with -i)"
+	echo "      -i Add the istio label to the namespace so istio is injected into the pods"
+	echo "      -m Run MDCB and configure edge gateways"
 	echo "      -N Use the given namespace name rather than the next available sandbox"
 	echo "         Useful when there's a need to import apis and policy YAML with set namespace"
-	echo "      -n don't use '$ENVFILE' to bootstrap the install"
-	echo "      -o create OperatorContext for Tyk Operator"
-	echo "      -p deploy with postgres not mongo"
-	echo "      -s deploy a stand alone gateway"
-	echo "      -t description of the sandbox namespace"
-	echo "      -v version tag. The file $VERSIONFILE contains the versions used"
+	echo "      -n Don't use '$ENVFILE' to bootstrap the install"
+	echo "      -o Create OperatorContext for Tyk Operator"
+	echo "      -p Deploy with postgres not mongo"
+	echo "      -s Deploy a stand alone gateway"
+	echo "      -t Description of the sandbox namespace"
+	echo "      -v Version tag. The file $VERSIONFILE contains the versions used"
 	echo "$name delete <sandbox namespace...>"
 	echo "      Delete the sandbox namespace given as a tag and all resources in it"
 	echo "$name info <sandbox namespace...>"
@@ -129,6 +131,12 @@ function help {
 	echo "      eg. $name shell ksandbox-1 dashboard"
 	echo "$name start"
 	echo "      Start the minikube cluster if it's not running"
+	echo
+	echo "Environment variable meanings:"
+	echo "      KSBCTL_CLUSTER: use the named cluster rather than the default 'minikube'"
+	echo "                      This can also be specified by '$name -C CLUSTERNAME create' etc."
+	echo "      KSBX_OPERATOR_VERSION: use the named Tyk operator release when setting up operator using"
+	echo "                      $name setup operator"
 }
 
 function getAllSandboxes {
@@ -609,15 +617,31 @@ function OperatorContextExists {
 # KSBX_MDCB_VERS which has the MDCB version. This is used to pull the MDCB docker image
 # KSBX_NS which is the namespace for the pods etc.
 function applyYAMLtemplate {
-	typeset YAML
 	typeset YAMLfile
-	YAML=""
+	typeset tmpYamlFile
 	for YAMLfile in $*; do
 		YAMLfile=$(basename $YAMLfile)
+		tmpYamlFile=$(mktemp /tmp/XXXXX-$YAMLfile)
 		if [[ -f $YAMLDIR/$YAMLfile ]]; then
-			cat $YAMLDIR/$YAMLfile | envsubst | tee -a /tmp/yaml | kubectl apply -n $NAMESPACE -f -
+			cat $YAMLDIR/$YAMLfile | envsubst > $tmpYamlFile
+			if [[ -n $ENV_VAR_FILE ]]; then
+				if grep -qw 'kind: Deployment' $tmpYamlFile; then
+					addEnvVars $tmpYamlFile
+				fi
+			fi
+			kubectl apply -n $NAMESPACE -f $tmpYamlFile
 		fi
+		#rm -f $tmpYamlFile
 	done
+}
+
+function addEnvVars {
+	typeset YAMLfile
+	typeset VAR
+	typeset VALUE
+	typeset line
+	YAMLfile=$1
+	yq eval '(.spec.template.spec.containers[0].envFrom) += [{"configMapRef": {"name": "sandbox-env-vars"}}]' -i $YAMLfile
 }
 
 # apply the licence to the dashboard
@@ -953,7 +977,7 @@ if [[ $# -gt 0 ]]; then
 	case $1 in 
 		create)
 			shift
-			while getopts :c:de:himN:nopst:v: arg; do
+			while getopts :c:de:E:himN:nopst:v: arg; do
 				case $arg in
 					c)
 						# the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -963,6 +987,14 @@ if [[ $# -gt 0 ]]; then
 					d)
 						# Don't publish any APIs
 						PUBLISH_APIS=false
+						;;
+					E)
+						# environment variable file
+						ENV_VAR_FILE=$OPTARG
+						if [[ ! -f $ENV_VAR_FILE ]]; then
+							echo "[FATAL]Cannot read environment variable file: '$ENV_VAR_FILE'"
+							exit 1
+						fi
 						;;
 					e)
 						# the number of edge gateways to deploy (must be combined with -m to deploy MDCB)
@@ -1088,6 +1120,10 @@ if [[ $# -gt 0 ]]; then
 						exit 1
 					fi
 					createNamespace
+					if [[ -n $ENV_VAR_FILE ]]; then
+						# create a config map to hold the environment variables
+						kubectl create configmap sandbox-env-vars --from-env-file=$ENV_VAR_FILE -n $NAMESPACE
+					fi
 					if [[ $KSBX_DATABASE == 'mongo' ]]; then
 						echo "[INFO]Starting redis and mongo in the control plane"
 						applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
@@ -1159,6 +1195,10 @@ if [[ $# -gt 0 ]]; then
 					# create standalone (CE) deployment of the gateway
 					loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
 					createNamespace
+					if [[ -n $ENV_VAR_FILE ]]; then
+						# create a config map to hold the environment variables
+						kubectl create configmap sandbox-env-vars --from-env-file=$ENV_VAR_FILE -n $NAMESPACE
+					fi
 					applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
 					waitDeploymentReady control-redis
 					applyYAMLtemplate tyk-gateway-configmap-standalone.yaml
@@ -1314,7 +1354,7 @@ if [[ $# -gt 0 ]]; then
 					fi
 					if [[ -n $newPodVersion ]]; then
 						typeset currentVersion
-						currentVersion=$(yq .spec.template.spec.containers.[0].image $tmpDeploymentYaml | cut -d: -f2)
+						currentVersion=$(yq '.spec.template.spec.containers.[0].image' $tmpDeploymentYaml | cut -d: -f2)
 						sed -i "s/$currentVersion/$newPodVersion/" $tmpDeploymentYaml
 					fi
 					echo "[INFO]kubectl apply -f $tmpDeploymentYaml -n $NAMESPACE"
