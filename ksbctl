@@ -1112,7 +1112,7 @@ if [[ $# -gt 0 ]]; then
 						applyYAMLtemplate tyk-dashboard-configmap-postgres.yaml tyk-pump-configmap-postgres.yaml
 					fi
 					# create dashboard, control gateway and pump deployments
-					applyYAMLtemplate tyk-dashboard.yaml tyk-gateway-control.yaml tyk-pump.yaml
+					applyYAMLtemplate tyk-dashboard-deployment.yaml tyk-gateway-control-deployment.yaml tyk-pump-deployment.yaml
 					# create dashboard and control gateway services
 					applyYAMLtemplate tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
 					waitDeploymentReady tyk-dashboard
@@ -1136,7 +1136,7 @@ if [[ $# -gt 0 ]]; then
 						applyYAMLtemplate tyk-mdcb-deployment.yaml tyk-mdcb-svc.yaml
 						waitDeploymentReady tyk-sink
 						# deploy edge gateway(s)
-						applyYAMLtemplate tyk-gateway-edge.yaml
+						applyYAMLtemplate tyk-gateway-edge-deployment.yaml
 						if [[ $ENABLE_HTTPS == 'true' ]]; then
 							enableEdgeHttps
 						fi
@@ -1162,7 +1162,7 @@ if [[ $# -gt 0 ]]; then
 					applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
 					waitDeploymentReady control-redis
 					applyYAMLtemplate tyk-gateway-configmap-standalone.yaml
-					applyYAMLtemplate tyk-gateway-standalone.yaml
+					applyYAMLtemplate tyk-gateway-standalone-deployment.yaml
 					applyYAMLtemplate tyk-gateway-svc-standalone.yaml
 					waitDeploymentReady standalone-gateway
 					if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
