@@ -1098,7 +1098,7 @@ if [[ $# -gt 0 ]]; then
 					elif [[ $KSBX_DATABASE == 'postgres' ]]; then
 						echo "[INFO]Starting redis and postgres in the control plane"
 						applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
-						applyYAMLtemplate postgres.yaml
+						applyYAMLtemplate postgres-PersistentVolumeClaim.yaml postgres-deployment.yaml postgres-svc.yaml
 						# applyYAMLtemplate grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
 						waitDeploymentReady control-redis
 						waitDeploymentReady postgres-db
