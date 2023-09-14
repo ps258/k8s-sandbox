@@ -28,7 +28,7 @@ data:
         "multiple_ips_handle_strategy": "random",
         "ttl": 60
       },
-      "enable_analytics": true,
+      "enable_analytics": false,
       "enable_bundle_downloader": false,
       "enable_custom_domains": true,
       "enable_hashed_keys_listing": true,
