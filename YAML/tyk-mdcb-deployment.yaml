@@ -67,25 +67,3 @@ spec:
             items:
               - key: tyk_sink.conf
                 path: tyk_sink.conf
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: tyk-sink
-  labels:
-    app: tyk-sink
-    plane: control
-spec:
-  ports:
-  - name: "rpc" 
-    port: 9090
-    protocol: TCP
-    targetPort: 9090
-  - name: "health"
-    port: 8181
-    protocol: TCP
-    targetPort: 8181
-  type: NodePort
-  selector:
-    app: tyk-sink
-    plane: control

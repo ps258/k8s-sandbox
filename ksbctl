@@ -1133,7 +1133,7 @@ if [[ $# -gt 0 ]]; then
 						fi
 						waitDeploymentReady edge-redis
 						# deploy MDCB
-						applyYAMLtemplate tyk-mdcb.yaml
+						applyYAMLtemplate tyk-mdcb-deployment.yaml tyk-mdcb-svc.yaml
 						waitDeploymentReady tyk-sink
 						# deploy edge gateway(s)
 						applyYAMLtemplate tyk-gateway-edge.yaml
