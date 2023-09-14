@@ -1120,7 +1120,8 @@ if [[ $# -gt 0 ]]; then
 						export KSBX_ADMIN_API_KEY=$(getAdminUserKey)
 						export KSBX_ORG_ID=$(getOrgID)
 						enableHybrid $KSBX_ORG_ID $KSBX_ADMIN_API_KEY
-						applyYAMLtemplate edge-redis.yaml tyk-gateway-configmap-edge.yaml
+						applyYAMLtemplate edge-redis-PersistentVolumeClaim.yaml edge-redis-deployment.yaml edge-redis-svc.yaml
+						applyYAMLtemplate tyk-gateway-configmap-edge.yaml
 						if [[ $KSBX_DATABASE == 'mongo' ]]; then
 							applyYAMLtemplate tyk-mdcb-configmap-mongo.yaml
 						elif [[ $KSBX_DATABASE == 'postgres' ]]; then
