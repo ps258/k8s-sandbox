@@ -82,8 +82,7 @@ ENV_VAR_FILE=""
 function help {
 	typeset name
 	name=$(basename $SCRIPTNAME)
-	echo "[USAGE]:"
-	echo "$name create -v <tyk version> -t <namespace description> -N <namespace name> [-p|-s] [-c gateway_count] [-e edge_gw_count] [-m] [-o] [-i]"
+	echo "[USAGE]: $name create -v <tyk version> -t <namespace description> -N <namespace name> [-p|-s] [-c gateway_count] [-e edge_gw_count] [-m] [-o] [-i]"
 	echo "      Create a tyk instance in a namespace sandbox with the version given as a tag with -v"
 	echo "      -c The number of control plane gateway replicas to run"
 	echo "      -d Don't publish any sample APIs"
