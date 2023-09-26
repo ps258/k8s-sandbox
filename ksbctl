@@ -1452,6 +1452,8 @@ if [[ $# -gt 0 ]]; then
 			;;
 		*)
 			echo "[FATAL]$1 not implemented"
+			help
+			exit 1
 			;;
 	esac
 else
