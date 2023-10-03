@@ -18,10 +18,11 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #  sysctl -w fs.inotify.max_queued_events=2099999999
 
 
+set -x
 # check for -C option to specify the cluster
 if [[ $# -ge 2 ]]; then
 	if [[ $1 == '-C' ]]; then
-		CLUSTER=$2
+		KSBCTL_CLUSTER=$2
 		shift; shift
 	fi
 fi
@@ -34,6 +35,7 @@ else
 	CLUSTER=$KSBCTL_CLUSTER
 fi
 alias kubectl="kubectl --cluster=$CLUSTER"
+set +x
 
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
