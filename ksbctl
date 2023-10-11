@@ -1265,7 +1265,13 @@ if [[ $# -gt 0 ]]; then
 			shift
 			if [[ $# -lt 1 ]]; then
 				# give info on all if none given
-				set $(getAllSandboxes)
+        typeset allSandboxes
+        allSandboxes=$(getAllSandboxes)
+        if [[ $allSandboxes = "" ]]; then
+          echo "[INFO]No sandboxes configured"
+          exit 0
+        fi
+        set $allSandboxes
 			fi
 			for NAMESPACE in $(getNamespaceNames $*); do
 				if namespaceExists $NAMESPACE; then
@@ -1390,6 +1396,7 @@ if [[ $# -gt 0 ]]; then
       typeset operatorPodName
       operatorPodName=$(kubectl get pods -n tyk-operator-system --no-headers=true | awk '{print $1}')
       if [[ -n $operatorPodName ]]; then
+        echo "[INFO]kubectl logs $operatorPodName -n tyk-operator-system -f"
         kubectl logs $operatorPodName -n tyk-operator-system -f
       else
         echo "[FATAL]No operator pod found"
@@ -1400,7 +1407,13 @@ if [[ $# -gt 0 ]]; then
 			shift
 			if [[ $# -lt 1 ]]; then
 				# give info on all if none given
-				set $(getAllSandboxes)
+        typeset allSandboxes
+        allSandboxes=$(getAllSandboxes)
+        if [[ $allSandboxes = "" ]]; then
+          echo "[INFO]No sandboxes configured"
+          exit 0
+        fi
+        set $allSandboxes
 			fi
 			for NAMESPACE in $(getNamespaceNames $*); do
 				if namespaceExists $NAMESPACE; then
