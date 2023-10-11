@@ -17,8 +17,6 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 #  sysctl -w fs.inotify.max_user_instances=2099999999
 #  sysctl -w fs.inotify.max_queued_events=2099999999
 
-
-set -x
 # check for -C option to specify the cluster
 if [[ $# -ge 2 ]]; then
 	if [[ $1 == '-C' ]]; then
@@ -35,7 +33,7 @@ else
 	CLUSTER=$KSBCTL_CLUSTER
 fi
 alias kubectl="kubectl --cluster=$CLUSTER"
-set +x
+alias helm="helm --kube-context $CLUSTER"
 
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
@@ -119,6 +117,8 @@ function help {
 	echo "         so make sure it's right"
 	echo "$name monitor <sandbox namespace> <pod name>"
 	echo "      Print CPU and memory usage for the containers in the pod every $POD_MONITOR_FREQ seconds"
+	echo "$name operatorlogs"
+	echo "      Tail the logs of the tyk operator pod"
 	echo "$name pods <sandbox namespace...>"
 	echo "      List pods in namespace"
 	echo "$name publish <sandbox namespace> <api.json ...>"
@@ -268,9 +268,9 @@ function setGlobals {
 # copy "$SCRIPTDIR/etc/tmp.conf" into minikube so that permanent volumes can be created
 function setupMinikubeStorage {
 	if which minikube > /dev/null 2>&1 ; then
-		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ; then
+		if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
 			echo "[INFO]Configuring minikube cluster '$CLUSTER' to enable permanent volumes for databases"
-			minikube cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
+			minikube -p $CLUSTER cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
 		fi
 	else
 		echo "[WARN]Minikube not installed. Cannot configure"
@@ -280,7 +280,7 @@ function setupMinikubeStorage {
 function startMinikube {
 	if minikubeProfileExists; then
 		if [[ $(minikube profile list | awk '/'$CLUSTER'/ {print $14}') = 'Stopped' ]]; then
-			minikube start -p $CLUSTER
+			minikube -p $CLUSTER start
 		else
 			echo "[WARN]Minikube cluser '$CLUSTER' is already running"
 		fi
@@ -293,12 +293,12 @@ function startMinikube {
 # start minikube if it's not already running
 function setupMinikube {
 	if which minikube > /dev/null 2>&1 ; then
-		if ! minikube status -p $CLUSTER > /dev/null 2>&1 ; then
+		if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
 			echo "[INFO]Starting minikube cluster '$CLUSTER'"
-			minikube start -p $CLUSTER --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
+			minikube -p $CLUSTER start --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
 			minikube profile $CLUSTER
-			minikube addons enable metrics-server
-			minikube addons enable dashboard
+			minikube -p $CLUSTER addons enable metrics-server
+			minikube -p $CLUSTER addons enable dashboard
 			# give it a few seconds to settle down
 			sleep 5
 		else
@@ -420,10 +420,10 @@ function getAdminUserKey {
 	typeset redisPort
 	typeset redisKey
 	redisPort=$(getControlRedisPort)
-	for redisKey in $(redis-cli -h $IP -p $redisPort --scan --pattern 'tyk-admin-api-*'); do
+	for redisKey in $(redis-cli -h $IP -p $redisPort --scan --pattern 'tyk-admin-api-*' 2> /dev/null ); do
 		if [[ $(redis-cli -h $IP -p $redisPort type $redisKey) == 'string' ]]; then
-			if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey | jq -r .UserData.user_permissions.IsAdmin) ]]; then
-				redis-cli -h $IP -p $redisPort get $redisKey | jq -r .UserData.access_key 
+			if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.user_permissions.IsAdmin) ]]; then
+				redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.access_key 
 				return 0
 			fi
 		fi
@@ -1386,6 +1386,16 @@ if [[ $# -gt 0 ]]; then
 				sleep $POD_MONITOR_FREQ
 			done
 			;;
+    operatorlogs)
+      typeset operatorPodName
+      operatorPodName=$(kubectl get pods -n tyk-operator-system --no-headers=true | awk '{print $1}')
+      if [[ -n $operatorPodName ]]; then
+        kubectl logs $operatorPodName -n tyk-operator-system -f
+      else
+        echo "[FATAL]No operator pod found"
+        exit 1
+      fi
+      ;;
 		pods)
 			shift
 			if [[ $# -lt 1 ]]; then
