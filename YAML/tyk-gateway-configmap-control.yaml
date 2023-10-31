@@ -92,9 +92,6 @@ data:
         "type": "redis",
         "username": ""
       },
-      "slave_options": {
-        "synchroniser_enabled": true
-      },
       "template_path": "/opt/tyk-gateway/templates",
       "track_404_logs": true,
       "tyk_js_path": "/opt/tyk-gateway/js/tyk.js",
