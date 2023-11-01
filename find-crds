@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# parameters
+# -K kubernetes context
+# -N namespace to search (searches all if not defined)
+# -C CRD type to search for
+
+KUBECONTEXT=minikube
+
+function help {
+	echo "$0 -K kubectl_context -N namespace to search (searches all if not defined) -C CRD type to search for"
+}
+
+while getopts :K:N:C:h arg
+do
+  case $arg in
+    K)
+      KUBECONTEXT=$OPTARG
+      ;;
+    N)
+      NAMESPACE=$OPTARG
+      ;;
+    C)
+      CRD=$OPTARG
+      ;;
+		h)
+			help
+			exit 0
+			;;
+    :)
+      echo "Option -$OPTARG requires an arguement."
+      exit 1
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG"
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -n $KUBECONTEXT ]]; then
+	CLUSTER=" --cluster=$KUBECONTEXT"
+fi
+
+if [[ -n $NAMESPACE ]]; then
+	namespaceList=$NAMESPACE
+else
+	namespaceList=$(kubectl get ns --no-headers=true $CLUSTER | awk '{print $1}')
+fi
+
+if [[ -n $CRD ]]; then
+	crds=$CRD
+else
+	crds=$(kubectl get crd -A $CLUSTER | awk -F. '/tyk/ {print $1}')
+fi
+
+for ns in $namespaceList; do
+	for crd in $crds; do
+		if [[ $(kubectl get $crd -n $ns $CLUSTER 2> /dev/null | wc -l) -gt 0 ]]; then
+			echo "NS $ns CRD $crd"
+			kubectl get $crd -n $ns $CLUSTER 2> /dev/null
+		fi
+	done
+done
