@@ -15,6 +15,7 @@ data:
         "enable_detailed_recording": true
       },
       "app_path": "/opt/tyk-gateway/apps/",
+      "bundle_base_url": "http://$KSBX_LOCAL_IP:8000",
       "close_connections": false,
       "close_idle_connections": false,
       "control_api_hostname": "",
@@ -29,7 +30,7 @@ data:
         "ttl": 60
       },
       "enable_analytics": false,
-      "enable_bundle_downloader": false,
+      "enable_bundle_downloader": true,
       "enable_custom_domains": true,
       "enable_hashed_keys_listing": true,
       "enable_http_profiler": true,
@@ -97,5 +98,5 @@ data:
         "disable": false
       },
       "use_db_app_configs": false,
-      "use_redis_log": true
+      "use_redis_log": false
     }

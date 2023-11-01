@@ -24,6 +24,7 @@ data:
         },
         "force_auth_provider": true
       },
+      "bundle_base_url": "http://$KSBX_LOCAL_IP:8000",
       "close_connections": false,
       "close_idle_connections": false,
       "control_api_hostname": "",
@@ -32,7 +33,6 @@ data:
         "python_path_prefix": "/opt/tyk-gateway"
       },
       "db_app_conf_options": {
-        "connection_string": "",
         "node_is_segmented": true,
         "tags": [ "edge" ]
       },
@@ -44,7 +44,7 @@ data:
         "ttl": 60
       },
       "enable_analytics": true,
-      "enable_bundle_downloader": false,
+      "enable_bundle_downloader": true,
       "enable_custom_domains": true,
       "enable_hashed_keys_listing": true,
       "enable_http_profiler": true,
