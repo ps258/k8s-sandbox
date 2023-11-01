@@ -71,6 +71,8 @@ export KSBX_PGUSER=postgresx			# default postgres username
 export KSBX_PGDB=tyk_analytics		# default postgres database
 export KSBX_CONTROL_GATEWAY_REPLICAS=1		# default number of control gateways to run
 export KSBX_EDGE_GATEWAY_REPLICAS=1		# default number of edge gateways to run
+# KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s
+export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
 ENVFILE=~/.tyk-sandbox
 SBX_LICENSE=""
 SBX_MDCB_LICENSE=""
@@ -78,6 +80,8 @@ SBX_USER=""
 SBX_PASSWORD=""
 PUBLISH_APIS=true
 ENV_VAR_FILE=""
+OPERATOR_CONTEXT_NAME=local-operator-context
+OPERATOR_MASK_URL=http://httpbin.org/anything/200
 
 function help {
 	typeset name
@@ -260,8 +264,8 @@ function setGlobals {
 		# check for command dependencies
 		IP=$(getMinikubeIP)
 	else
-		# attempt to find a local IP to use. This won't help with a remote K8s cluster
-		IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
+		# Fall back to the local IP address
+		IP=$KSBX_LOCAL_IP
 	fi
 }
 
@@ -560,7 +564,7 @@ function createNamespace {
 function namespaceExists {
 	typeset namespace
 	typeset ns
-	namespace="$1"
+	namespace=$1
 	for ns in $(kubectl get namespaces --no-headers=true | awk '{print $1}'); do
 		if [[ "$ns" == $namespace ]]; then
 			return 0
@@ -573,7 +577,7 @@ function CrdExists {
 	typeset namespace
 	typeset CRD
 	typeset CrdCount
-	namespace="$1"
+	namespace=$1
 	CRD=$2
 	CrdCount=0
 	if kubectl get crd -n $namespace --no-headers=true | grep -q "$CRD"; then
@@ -585,20 +589,24 @@ function CrdExists {
 	return 1
 }
 
-function SecurityPoliciesExist {
-	if CrdExists $1 securitypolicies.tyk.tyk.io
-	then
-		return 0
-	fi
-	return 1
+function MaskOperatorContext {
+  typeset namespace
+  namespace=$1
+  if CrdExists $namespace operatorcontexts.tyk.tyk.io; then
+    kubectl get operatorcontext $OPERATOR_CONTEXT_NAME -n $namespace -o yaml | yq  '.spec.env.url = "'$OPERATOR_MASK_URL'"' | kubectl apply -n $namespace -f -
+  fi
 }
 
-function ApiDefinitionsExist {
-	if CrdExists $1 apidefinitions.tyk.tyk.io
-	then
-		return 0
-	fi
-	return 1
+function RemoveTykCRDs {
+  typeset namespace
+  typeset CRD
+  namespace=$1
+  for CRD in portalapicatalogues apidescriptions securitypolicies apidefinitions supergraphs subgraphs portalconfigs; do
+    if CrdExists $namespace $CRD; then
+      echo "[INFO]Removing all $CRD from $namespace"
+      kubectl delete $CRD --all -n $namespace
+    fi
+  done
 }
 
 function OperatorContextExists {
@@ -726,12 +734,12 @@ function loadVersions {
 
 # spawn a shell in a pod
 function runShell {
-	typeset podType
+	typeset podPartName
 	typeset pod
-	for podType in $*
+	for podPartName in $*
 	do
-		echo "[INFO]Creating shell for $podType"
-		for pod in $(kubectl get pods -n $NAMESPACE | awk '/'$podType'/ {print $1}')
+		echo "[INFO]Creating shell for $podPartName"
+		for pod in $(kubectl get pods -n $NAMESPACE | awk '/'$podPartName'/ {print $1}')
 		do
 			# if ncurses-base isnt installed then TERM isn't recognised
 			# I found it was installed in some images but not others
@@ -750,12 +758,17 @@ function runShell {
 
 # tail the pods logs
 function showLogs {
-	typeset podType
+	typeset podPartName
 	typeset pod
-	podType=$1
-	pod=$(kubectl get pods -n $NAMESPACE | awk '/'$podType'/ {print $1}' | head -1)
-	echo "[INFO]kubectl logs -n $NAMESPACE $pod -f"
-	kubectl logs -n $NAMESPACE $pod -f
+	podPartName=$1
+	pod=$(kubectl get pods -n $NAMESPACE | awk '/'$podPartName'/ {print $1}' | head -1)
+  if [[ -n $pod ]]; then
+	  echo "[INFO]kubectl logs -n $NAMESPACE $pod -f"
+	  kubectl logs -n $NAMESPACE $pod -f
+  else
+    echo "[FATAL]'$podPartName' not found in namespace $NAMESPACE"
+    kubectl get pods -n $NAMESPACE
+  fi
 }
 
 # Hybrid needs to be enabled for MDCB installs
@@ -913,7 +926,7 @@ function deployOperatorContext {
 		echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
 		echo "kind: OperatorContext" >> $OperatorContextYAML
 		echo "metadata:" >> $OperatorContextYAML
-		echo "  name: local-operator-context" >> $OperatorContextYAML
+		echo "  name: $OPERATOR_CONTEXT_NAME" >> $OperatorContextYAML
 		echo "spec:" >> $OperatorContextYAML
 		echo "  env:" >> $OperatorContextYAML
 		echo "    mode: pro" >> $OperatorContextYAML
@@ -934,7 +947,7 @@ function deployOperatorContext {
 		echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
 		echo "kind: OperatorContext" >> $OperatorContextYAML
 		echo "metadata:" >> $OperatorContextYAML
-		echo "  name: local-operator-context" >> $OperatorContextYAML
+		echo "  name: $OPERATOR_CONTEXT_NAME" >> $OperatorContextYAML
 		echo "spec:" >> $OperatorContextYAML
 		echo "  env:" >> $OperatorContextYAML
 		echo "    mode: ce" >> $OperatorContextYAML
@@ -1235,18 +1248,8 @@ if [[ $# -gt 0 ]]; then
 			for NAMESPACE in $(getNamespaceNames $*); do
 				if namespaceExists $NAMESPACE; then
 					echo "[INFO]Deleting Namespace $NAMESPACE"
-					# clean up the policies first
-					if SecurityPoliciesExist $NAMESPACE; then
-						echo "[INFO]Deleting SecurityPolicies from $NAMESPACE"
-						echo "[INFO]kubectl delete SecurityPolicy --all -n $NAMESPACE"
-						kubectl delete SecurityPolicy --all -n $NAMESPACE
-					fi
-					# clean up the APIs first
-					if ApiDefinitionsExist $NAMESPACE; then
-						echo "[INFO]Deleting ApiDefinitions from $NAMESPACE"
-						echo "[INFO]kubectl delete ApiDefinition --all -n $NAMESPACE"
-						kubectl delete ApiDefinition --all -n $NAMESPACE
-					fi
+          MaskOperatorContext $NAMESPACE
+          RemoveTykCRDs $NAMESPACE
 					if OperatorContextExists $NAMESPACE ]]; then
 						echo "[INFO]Deleting OperatorContext from $NAMESPACE"
 						echo "[INFO]kubectl delete OperatorContext --all -n $NAMESPACE"
