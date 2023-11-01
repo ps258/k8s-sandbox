@@ -71,8 +71,8 @@ export KSBX_PGUSER=postgresx			# default postgres username
 export KSBX_PGDB=tyk_analytics		# default postgres database
 export KSBX_CONTROL_GATEWAY_REPLICAS=1		# default number of control gateways to run
 export KSBX_EDGE_GATEWAY_REPLICAS=1		# default number of edge gateways to run
-# KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s
-export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}'| head -1)
+# KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s (Overridden by SBX_HOST_IP_ADDR if it's defined)
+export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}' | sort -n | head -1)
 ENVFILE=~/.tyk-sandbox
 SBX_LICENSE=""
 SBX_MDCB_LICENSE=""
@@ -1080,6 +1080,9 @@ if [[ $# -gt 0 ]]; then
 			if [[ $BOOTSTRAP == 'true' && -f $ENVFILE ]]; then
 				# load env variables
 				. $ENVFILE
+				if [[ -n $SBX_HOST_IP_ADDR ]]; then
+					KSBX_LOCAL_IP=$SBX_HOST_IP_ADDR
+				fi
 			fi
 			if [[ $INSTALL_EDGE == 'true' ]]; then
 				checkMDCBlicence
