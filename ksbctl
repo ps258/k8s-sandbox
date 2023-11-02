@@ -136,6 +136,8 @@ function help {
 	echo "      eg. $name shell ksandbox-1 dashboard"
 	echo "$name start"
 	echo "      Start the minikube cluster if it's not running"
+	echo "$name versions"
+	echo "      Show the image version of each pod in each deployment"
 	echo
 	echo "Environment variable meanings:"
 	echo "      KSBCTL_CLUSTER: use the named cluster rather than the default 'minikube'"
@@ -1479,6 +1481,26 @@ if [[ $# -gt 0 ]]; then
 		start)
 			startMinikube
 			;;
+    version*)
+			shift
+			if [[ $# -lt 1 ]]; then
+				# give info on all if none given
+				typeset allSandboxes
+				allSandboxes=$(getAllSandboxes)
+				if [[ $allSandboxes = "" ]]; then
+					echo "[INFO]No sandboxes configured"
+					exit 0
+				fi
+				set $allSandboxes
+			fi
+			for NAMESPACE in $(getNamespaceNames $*); do
+        echo "[INFO]$NAMESPACE deployed versions"
+        for deployment in $(kubectl get deploy --no-headers=true -n $NAMESPACE | awk '{print $1}'); do
+          echo "   $deployment: $(kubectl get deploy $deployment -n $NAMESPACE -o yaml | yq ".spec.template.spec.containers.[].image" | xargs)"
+        done | sort
+        echo
+      done
+      ;;
 		*)
 			echo "[FATAL]$1 not implemented"
 			help
