@@ -246,7 +246,7 @@ function checkMongoShellInstalled {
 	fi
 }
 
-function minikubeProfileExists  {
+function minikubeProfileExists {
 	if minikube profile list 2> /dev/null | grep -qw $CLUSTER; then
 		return 0
 	else
@@ -334,7 +334,7 @@ function setupHelmAndOperator {
 		helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
 		helm repo update
 		echo "[INFO]Attempting to deploy operator using helm. This may take a while"
-		if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system --atomic  $operatorVersion; then
+		if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system --atomic $operatorVersion; then
 			echo "[WARN]Operator install failed. Retrying, but only once"
 			kubectl delete ns tyk-operator-system --wait
 			kubectl create namespace tyk-operator-system
@@ -595,7 +595,7 @@ function MaskOperatorContext {
 	typeset namespace
 	namespace=$1
 	if CrdExists $namespace operatorcontexts.tyk.tyk.io; then
-		kubectl get operatorcontext $OPERATOR_CONTEXT_NAME -n $namespace -o yaml | yq  '.spec.env.url = "'$OPERATOR_MASK_URL'"' | kubectl apply -n $namespace -f -
+		kubectl get operatorcontext $OPERATOR_CONTEXT_NAME -n $namespace -o yaml | yq '.spec.env.url = "'$OPERATOR_MASK_URL'"' | kubectl apply -n $namespace -f -
 	fi
 }
 
@@ -851,12 +851,12 @@ function tidyPVCs {
 function createApiDefintion {
 	typeset APIfile
 	APIfile="$1"
-	echo '  {'
-	echo '    "api_model": {},'
-	echo '    "api_definition":' $(<"$APIfile") ','
-	echo '    "hook_references": [],'
-	echo '    "is_site": false,'
-	echo '    "sort_by": 0'
+	echo '{'
+	echo '  "api_model": {},'
+	echo '  "api_definition":' $(<"$APIfile") ','
+	echo '  "hook_references": [],'
+	echo '  "is_site": false,'
+	echo '  "sort_by": 0'
 	echo '}'
 }
 
@@ -1199,7 +1199,7 @@ if [[ $# -gt 0 ]]; then
 					fi
 					if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
 							deployOperatorContext
-				  fi
+					fi
 					if [[ $PUBLISH_APIS == 'true' ]]; then
 						if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
 							publishAPIs $SCRIPTDIR/APIs/*.json
@@ -1225,7 +1225,7 @@ if [[ $# -gt 0 ]]; then
 					waitDeploymentReady standalone-gateway
 					if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
 							deployOperatorContext
-				  fi
+					fi
 					if [[ $PUBLISH_APIS == 'true' ]]; then
 						if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
 							publishAPIs $SCRIPTDIR/APIs/*.json
@@ -1304,6 +1304,55 @@ if [[ $# -gt 0 ]]; then
 			echo "[INFO]kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL"
 			kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL
 			;;
+
+		get)
+			shift
+			NAMESPACE=$(getNamespaceNames $1)
+			shift
+			case $1 in
+				[Dd]esc*)
+					getDescription
+					;;
+				dash*)
+					echo http://$IP:$(getDashboardPort)/
+					;;
+				control-g*|gate*)
+					echo http://$IP:$(getControlGatewayPort)/
+					;;
+				MDCB*)
+					echo $IP:$(getMDCBPort)
+					;;
+				edge-g*)
+					typeset https
+					https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
+					if [[ $https == 'true' ]]; then
+						echo https://$IP:$(getEdgeGatewayPort)/
+					else
+						echo http://$IP:$(getEdgeGatewayPort)/
+					fi
+					;;
+				mong*)
+					echo mongodb://$IP:$(getMongoPort)/tyk_analytics
+					;;
+				control-r*|redis)
+					echo $IP:$(getControlRedisPort)
+					;;
+				edge-r*)
+					echo $IP:$(getEdgeRedisPort)
+					;;
+				*[kK]ey)
+					echo $(getAdminUserKey)
+					;;
+				[Oo]rg*)
+					echo $(getOrgID)
+					;;
+				*)
+					echo "[FATAL]Unknown option $1"
+					exit 1
+					;;
+			esac
+			;;
+
 		log*)
 			shift
 			if [[ $# -lt 2 ]]; then
@@ -1481,7 +1530,7 @@ if [[ $# -gt 0 ]]; then
 		start)
 			startMinikube
 			;;
-    version*)
+		version*)
 			shift
 			if [[ $# -lt 1 ]]; then
 				# give info on all if none given
@@ -1494,13 +1543,13 @@ if [[ $# -gt 0 ]]; then
 				set $allSandboxes
 			fi
 			for NAMESPACE in $(getNamespaceNames $*); do
-        echo "[INFO]$NAMESPACE deployed versions"
-        for deployment in $(kubectl get deploy --no-headers=true -n $NAMESPACE | awk '{print $1}'); do
-          echo "   $deployment: $(kubectl get deploy $deployment -n $NAMESPACE -o yaml | yq ".spec.template.spec.containers.[].image" | xargs)"
-        done | sort
-        echo
-      done
-      ;;
+				echo "[INFO]$NAMESPACE deployed versions"
+				for deployment in $(kubectl get deploy --no-headers=true -n $NAMESPACE | awk '{print $1}'); do
+					echo "   $deployment: $(kubectl get deploy $deployment -n $NAMESPACE -o yaml | yq ".spec.template.spec.containers.[].image" | xargs)"
+				done | sort
+				echo
+			done
+			;;
 		*)
 			echo "[FATAL]$1 not implemented"
 			help
