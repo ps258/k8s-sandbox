@@ -82,7 +82,7 @@ data:
       "secret": "Secret",
       "slave_options": {
         "synchroniser_enabled": true
-      }
+      },
       "ssl_force_common_name_check": false,
       "storage": {
         "database": 0,
