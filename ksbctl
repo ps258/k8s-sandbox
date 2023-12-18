@@ -19,18 +19,18 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 
 # check for -C option to specify the cluster
 if [[ $# -ge 2 ]]; then
-	if [[ $1 == '-C' ]]; then
-		KSBCTL_CLUSTER=$2
-		shift; shift
-	fi
+  if [[ $1 == '-C' ]]; then
+    KSBCTL_CLUSTER=$2
+    shift; shift
+  fi
 fi
 
 if [[ -z $KSBCTL_CLUSTER ]]; then
-	if [[ -z $CLUSTER ]]; then
-		CLUSTER=minikube
-	fi
+  if [[ -z $CLUSTER ]]; then
+    CLUSTER=minikube
+  fi
 else
-	CLUSTER=$KSBCTL_CLUSTER
+  CLUSTER=$KSBCTL_CLUSTER
 fi
 alias kubectl="kubectl --cluster=$CLUSTER"
 alias helm="helm --kube-context $CLUSTER"
@@ -38,8 +38,8 @@ alias helm="helm --kube-context $CLUSTER"
 SCRIPTNAME=$0
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
 SCRIPTDIR=$(
-	cd "$(dirname $SCRIPTNAME)"
-	echo $PWD
+  cd "$(dirname $SCRIPTNAME)"
+  echo $PWD
 )
 
 VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
@@ -66,11 +66,11 @@ MONGOSHELL=''
 INSTALL_OPR_CONTEXT=false
 BOOTSTRAP=true
 export KSBX_ADMIN_SECRET=admin_secret
-export KSBX_PGPASSWORD=password		# default postgres password
-export KSBX_PGUSER=postgresx			# default postgres username
-export KSBX_PGDB=tyk_analytics		# default postgres database
-export KSBX_CONTROL_GATEWAY_REPLICAS=1		# default number of control gateways to run
-export KSBX_EDGE_GATEWAY_REPLICAS=1		# default number of edge gateways to run
+export KSBX_PGPASSWORD=password   # default postgres password
+export KSBX_PGUSER=postgresx      # default postgres username
+export KSBX_PGDB=tyk_analytics    # default postgres database
+export KSBX_CONTROL_GATEWAY_REPLICAS=1  # default number of control gateways to run
+export KSBX_EDGE_GATEWAY_REPLICAS=1     # default number of edge gateways to run
 # KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s (Overridden by SBX_HOST_IP_ADDR if it's defined)
 export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}' | sort -n | head -1)
 ENVFILE=~/.tyk-sandbox
@@ -84,539 +84,541 @@ OPERATOR_CONTEXT_NAME=local-operator-context
 OPERATOR_MASK_URL=http://httpbin.org/anything/200
 
 function help {
-	typeset name
-	name=$(basename $SCRIPTNAME)
-	echo "[USAGE]: $name create -v <tyk version> -t <namespace description> -N <namespace name> [-p|-s] [-c gateway_count] [-e edge_gw_count] [-m] [-o] [-i]"
-	echo "      Create a tyk instance in a namespace sandbox with the version given as a tag with -v"
-	echo "      -c The number of control plane gateway replicas to run"
-	echo "      -d Don't publish any sample APIs"
-	echo "      -e The number of edge gateway replicas to run"
-	echo "      -E A file to read environment variables from and add them all deployments"
-	echo "      -h Setup the edge gateways to use https (implies -m and incompatible with -i)"
-	echo "      -i Add the istio label to the namespace so istio is injected into the pods"
-	echo "      -m Run MDCB and configure edge gateways"
-	echo "      -N Use the given namespace name rather than the next available sandbox"
-	echo "         Useful when there's a need to import apis and policy YAML with set namespace"
-	echo "      -n Don't use '$ENVFILE' to bootstrap the install"
-	echo "      -o Create OperatorContext for Tyk Operator"
-	echo "      -p Deploy with postgres not mongo"
-	echo "      -s Deploy a stand alone gateway"
-	echo "      -t Description of the sandbox namespace"
-	echo "      -v Version tag. The file $VERSIONFILE contains the versions used"
-	echo "$name delete <sandbox namespace...>"
-	echo "      Delete the sandbox namespace given as a tag and all resources in it"
-	echo "$name info <sandbox namespace...>"
-	echo "      Print info detailed info on sandbox namespaces"
-	echo "$name init"
-	echo "      Initialise minikube to enable persistent volumes"
-	echo "      This only needs to be done once in a minikube cluster"
-	echo "$name list"
-	echo "      List all sandbox namespaces"
-	echo "$name logs <sandbox namespace> <podname>"
-	echo "      Tail the logs of the named pod"
-	echo "$name modify <sandbox namespace> <deployment name> [-c count] [-v version]"
-	echo "      Modify deployment named to have a new number of pods and/or pods at the named version"
-	echo "      -c change the deployment to have the new number of pods"
-	echo "      -v rollout the named version into the pods. No checking of the version is done"
-	echo "         so make sure it's right"
-	echo "$name monitor <sandbox namespace> <pod name>"
-	echo "      Print CPU and memory usage for the containers in the pod every $POD_MONITOR_FREQ seconds"
-	echo "$name operatorlogs"
-	echo "      Tail the logs of the tyk operator pod"
-	echo "$name pods <sandbox namespace...>"
-	echo "      List pods in namespace"
-	echo "$name publish <sandbox namespace> <api.json ...>"
-	echo "      Publish the API in api.json into the sandbox"
-	echo "$name setup <operator|istio>"
-	echo "      operator: install the latest version of operator ready for contexts in sandbox namespaces"
-	echo "      istio: setup istio so that it's possible to monitor and configure the sandbox networks"
-	echo "$name shell <sandbox namespace> <podname>"
-	echo "      Start an interactive shell in the pod."
-	echo "      The pod name can be a substring of the actual name"
-	echo "      eg. $name shell ksandbox-1 dashboard"
-	echo "$name start"
-	echo "      Start the minikube cluster if it's not running"
-	echo "$name versions"
-	echo "      Show the image version of each pod in each deployment"
-	echo
-	echo "Environment variable meanings:"
-	echo "      KSBCTL_CLUSTER: use the named cluster rather than the default 'minikube'"
-	echo "                      This can also be specified by '$name -C CLUSTERNAME create' etc."
-	echo "      KSBX_OPERATOR_VERSION: use the named Tyk operator release when setting up operator using"
-	echo "                      $name setup operator"
+  typeset name
+  name=$(basename $SCRIPTNAME)
+  echo "[USAGE]: $name create -v <tyk version> -t <namespace description> -N <namespace name> [-p|-s] [-c gateway_count] [-e edge_gw_count] [-m] [-o] [-i]"
+  echo "      Create a tyk instance in a namespace sandbox with the version given as a tag with -v"
+  echo "      -c The number of control plane gateway replicas to run"
+  echo "      -d Don't publish any sample APIs"
+  echo "      -e The number of edge gateway replicas to run"
+  echo "      -E A file to read environment variables from and add them all deployments"
+  echo "      -h Setup the edge gateways to use https (implies -m and incompatible with -i)"
+  echo "      -i Add the istio label to the namespace so istio is injected into the pods"
+  echo "      -m Run MDCB and configure edge gateways"
+  echo "      -N Use the given namespace name rather than the next available sandbox"
+  echo "         Useful when there's a need to import apis and policy YAML with set namespace"
+  echo "      -n Don't use '$ENVFILE' to bootstrap the install"
+  echo "      -o Create OperatorContext for Tyk Operator"
+  echo "      -p Deploy with postgres not mongo"
+  echo "      -s Deploy a stand alone gateway"
+  echo "      -t Description of the sandbox namespace"
+  echo "      -v Version tag. The file $VERSIONFILE contains the versions used"
+  echo "$name delete <sandbox namespace...>"
+  echo "      Delete the sandbox namespace given as a tag and all resources in it"
+  echo "$name get <sandbox namespace...> [description|dashboard|control-gw|control-redis|edge-gw|edge-redis|key|mdcb|mongo|postgres|orgid]"
+  echo "      print the requested detail in a way that's useful in another script"
+  echo "$name info <sandbox namespace...>"
+  echo "      Print info detailed info on sandbox namespaces"
+  echo "$name init"
+  echo "      Initialise minikube to enable persistent volumes"
+  echo "      This only needs to be done once in a minikube cluster"
+  echo "$name list"
+  echo "      List all sandbox namespaces"
+  echo "$name logs <sandbox namespace> <podname>"
+  echo "      Tail the logs of the named pod"
+  echo "$name modify <sandbox namespace> <deployment name> [-c count] [-v version]"
+  echo "      Modify deployment named to have a new number of pods and/or pods at the named version"
+  echo "      -c change the deployment to have the new number of pods"
+  echo "      -v rollout the named version into the pods. No checking of the version is done"
+  echo "         so make sure it's right"
+  echo "$name monitor <sandbox namespace> <pod name>"
+  echo "      Print CPU and memory usage for the containers in the pod every $POD_MONITOR_FREQ seconds"
+  echo "$name operatorlogs"
+  echo "      Tail the logs of the tyk operator pod"
+  echo "$name pods <sandbox namespace...>"
+  echo "      List pods in namespace"
+  echo "$name publish <sandbox namespace> <api.json ...>"
+  echo "      Publish the API in api.json into the sandbox"
+  echo "$name setup <operator|istio>"
+  echo "      operator: install the latest version of operator ready for contexts in sandbox namespaces"
+  echo "      istio: setup istio so that it's possible to monitor and configure the sandbox networks"
+  echo "$name shell <sandbox namespace> <podname>"
+  echo "      Start an interactive shell in the pod."
+  echo "      The pod name can be a substring of the actual name"
+  echo "      eg. $name shell ksandbox-1 dashboard"
+  echo "$name start"
+  echo "      Start the minikube cluster if it's not running"
+  echo "$name versions"
+  echo "      Show the image version of each pod in each deployment"
+  echo
+  echo "Environment variable meanings:"
+  echo "      KSBCTL_CLUSTER: use the named cluster rather than the default 'minikube'"
+  echo "                      This can also be specified by '$name -C CLUSTERNAME create' etc."
+  echo "      KSBX_OPERATOR_VERSION: use the named Tyk operator release when setting up operator using"
+  echo "                      $name setup operator"
 }
 
 function getAllSandboxes {
-	kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL --no-headers=true 2>/dev/null | awk '{print $1}' | xargs
+  kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL --no-headers=true 2>/dev/null | awk '{print $1}' | xargs
 }
 
 # find the next namespace index that's unused
 function nextFreeNamespace {
-	typeset existing
-	typeset i
-	existing=$(kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL --no-headers=true 2>/dev/null | awk '{print $1}')
-	for i in $(seq 1 1000); do
-		test="ksandbox-$i"
-		if ! echo $existing | grep -qw $test; then
-			echo $i
-			break
-		fi
-	done
+  typeset existing
+  typeset i
+  existing=$(kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL --no-headers=true 2>/dev/null | awk '{print $1}')
+  for i in $(seq 1 1000); do
+    test="ksandbox-$i"
+    if ! echo $existing | grep -qw $test; then
+      echo $i
+      break
+    fi
+  done
 }
 
 # Check if a deployment exists with a partial name
 function deploymentExists {
-	typeset deployment
-	deployment=$1
-	if [[ $(kubectl get deployment --no-headers=true -n $NAMESPACE | grep $deployment | wc -l) -gt 0 ]]; then
-		if [[ $(kubectl get deployment --no-headers=true -n $NAMESPACE | grep $deployment | wc -l) -gt 1 ]]; then
-			echo "[FATAL]More than one deployment matches:"
-			kubectl get deployment --no-headers=true -n $NAMESPACE | awk '/'$deployment'/ {print $1}' 1>&2
-			return 1
-		fi
-	else
-		echo "[FATAL]No deployments match '$deployment'"
-		return 1
-	fi
-	return 0
+  typeset deployment
+  deployment=$1
+  if [[ $(kubectl get deployment --no-headers=true -n $NAMESPACE | grep $deployment | wc -l) -gt 0 ]]; then
+    if [[ $(kubectl get deployment --no-headers=true -n $NAMESPACE | grep $deployment | wc -l) -gt 1 ]]; then
+      echo "[FATAL]More than one deployment matches:"
+      kubectl get deployment --no-headers=true -n $NAMESPACE | awk '/'$deployment'/ {print $1}' 1>&2
+      return 1
+    fi
+  else
+    echo "[FATAL]No deployments match '$deployment'"
+    return 1
+  fi
+  return 0
 }
 
 # return a deployment name from partial match
 function getDeploymentName {
-	typeset deployment
-	deployment=$1
-	echo $(kubectl get deployment --no-headers=true -n $NAMESPACE | awk '/'$deployment'/ {print $1}')
+  typeset deployment
+  deployment=$1
+  echo $(kubectl get deployment --no-headers=true -n $NAMESPACE | awk '/'$deployment'/ {print $1}')
 }
 
 # allow the shortcut of using 1 to mean ksandbox-1 on the commandline
 function getNamespaceNames {
-	typeset namespaces
-	typeset namespace
-	namespaces=""
-	for namespace in $*; do
-		if ! namespaceExists $namespace; then
-			if ! echo $namespace | grep -q ksandbox- ; then
-				namespaces="$namespaces ksandbox-$namespace"
-			else
-				namespaces="$namespaces $namespace"
-			fi
-		else
-			namespaces="$namespaces $namespace"
-		fi
-	done
-	echo $namespaces
+  typeset namespaces
+  typeset namespace
+  namespaces=""
+  for namespace in $*; do
+    if ! namespaceExists $namespace; then
+      if ! echo $namespace | grep -q ksandbox- ; then
+        namespaces="$namespaces ksandbox-$namespace"
+      else
+        namespaces="$namespaces $namespace"
+      fi
+    else
+      namespaces="$namespaces $namespace"
+    fi
+  done
+  echo $namespaces
 }
 
 # there's no way to install the MDCB licence interactively so we must have it up front
 function checkMDCBlicence {
-	if [[ -z $SBX_MDCB_LICENSE ]]; then
-		echo "[FATAl]No MDCB license present in $ENVFILE. Please populate with SBX_MDCB_LICENSE=<MDCB LICENSE KEY>"
-		exit 1
-	else
-		export KSBX_MDCB_LICENSE=$SBX_MDCB_LICENSE
-	fi
+  if [[ -z $SBX_MDCB_LICENSE ]]; then
+    echo "[FATAl]No MDCB license present in $ENVFILE. Please populate with SBX_MDCB_LICENSE=<MDCB LICENSE KEY>"
+    exit 1
+  else
+    export KSBX_MDCB_LICENSE=$SBX_MDCB_LICENSE
+  fi
 }
 
 
 # verify that a command is in the PATH
 function checkCommandInstalled {
-	typeset cmd
-	for cmd in $*; do
-		if ! which $cmd >/dev/null; then
-			echo "[FATAL]Command '$cmd' not found. Cannot continue"
-			exit 1
-		fi
-	done
+  typeset cmd
+  for cmd in $*; do
+    if ! which $cmd >/dev/null; then
+      echo "[FATAL]Command '$cmd' not found. Cannot continue"
+      exit 1
+    fi
+  done
 }
 
 # the mongo shell can be called 'mongo' or 'mongosh' so check for both
 function checkMongoShellInstalled {
-	if [[ -z $MONGOSHELL ]]; then
-		if ! which mongo >/dev/null; then
-			if which mongosh > /dev/null; then
-				alias mongo=mongosh
-				MONGOSHELL=mongosh
-			else
-				echo "[FATAL]Mongo shell 'mongo' or 'mongosh' not installed. Cannot continue"
-				exit 1
-			fi
-		else
-				MONGOSHELL=mongo
-		fi
-	fi
+  if [[ -z $MONGOSHELL ]]; then
+    if ! which mongo >/dev/null; then
+      if which mongosh > /dev/null; then
+        alias mongo=mongosh
+        MONGOSHELL=mongosh
+      else
+        echo "[FATAL]Mongo shell 'mongo' or 'mongosh' not installed. Cannot continue"
+        exit 1
+      fi
+    else
+      MONGOSHELL=mongo
+    fi
+  fi
 }
 
 function minikubeProfileExists {
-	if minikube profile list 2> /dev/null | grep -qw $CLUSTER; then
-		return 0
-	else
-		return 1
-	fi
+  if minikube profile list 2> /dev/null | grep -qw $CLUSTER; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 function getMinikubeIP {
-	minikube profile list -l 2> /dev/null | awk '/'$CLUSTER'/ {print $8}'
+  minikube profile list -l 2> /dev/null | awk '/'$CLUSTER'/ {print $8}'
 }
 
 # checks done to setup env on every run
 function setGlobals {
-	checkCommandInstalled redis-cli jq envsubst psql yq
-	if which minikube > /dev/null 2>&1 ; then
-		#alias kubectl="minikube kubectl -- "
-		# check for command dependencies
-		IP=$(getMinikubeIP)
-	else
-		# Fall back to the local IP address
-		IP=$KSBX_LOCAL_IP
-	fi
+  checkCommandInstalled redis-cli jq envsubst psql yq
+  if which minikube > /dev/null 2>&1 ; then
+    #alias kubectl="minikube kubectl -- "
+    # check for command dependencies
+    IP=$(getMinikubeIP)
+  else
+    # Fall back to the local IP address
+    IP=$KSBX_LOCAL_IP
+  fi
 }
 
 # copy "$SCRIPTDIR/etc/tmp.conf" into minikube so that permanent volumes can be created
 function setupMinikubeStorage {
-	if which minikube > /dev/null 2>&1 ; then
-		if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
-			echo "[INFO]Configuring minikube cluster '$CLUSTER' to enable permanent volumes for databases"
-			minikube -p $CLUSTER cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
-		fi
-	else
-		echo "[WARN]Minikube not installed. Cannot configure"
-	fi
+  if which minikube > /dev/null 2>&1 ; then
+    if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
+      echo "[INFO]Configuring minikube cluster '$CLUSTER' to enable permanent volumes for databases"
+      minikube -p $CLUSTER cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
+    fi
+  else
+    echo "[WARN]Minikube not installed. Cannot configure"
+  fi
 }
 
 function startMinikube {
-	if minikubeProfileExists; then
-		if [[ $(minikube profile list | awk '/'$CLUSTER'/ {print $14}') = 'Stopped' ]]; then
-			minikube -p $CLUSTER start
-		else
-			echo "[WARN]Minikube cluser '$CLUSTER' is already running"
-		fi
-	else
-		echo "[FATAL]Minikube profile '$CLUSTER' does not exist. Use '$SCRIPTNAME -C $CLUSTER init' to create it"
-	fi
+  if minikubeProfileExists; then
+    if [[ $(minikube profile list | awk '/'$CLUSTER'/ {print $14}') = 'Stopped' ]]; then
+      minikube -p $CLUSTER start
+    else
+      echo "[WARN]Minikube cluser '$CLUSTER' is already running"
+    fi
+  else
+    echo "[FATAL]Minikube profile '$CLUSTER' does not exist. Use '$SCRIPTNAME -C $CLUSTER init' to create it"
+  fi
 }
 
 
 # start minikube if it's not already running
 function setupMinikube {
-	if which minikube > /dev/null 2>&1 ; then
-		if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
-			echo "[INFO]Starting minikube cluster '$CLUSTER'"
-			minikube -p $CLUSTER start --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
-			minikube profile $CLUSTER
-			minikube -p $CLUSTER addons enable metrics-server
-			minikube -p $CLUSTER addons enable dashboard
-			# give it a few seconds to settle down
-			sleep 5
-		else
-			echo "[WARN]Minikube cluster '$CLUSTER' is already running. Not starting it again"
-		fi
-	else
-		echo "[WARN]Minikube not installed. Cannot start"
-	fi
+  if which minikube > /dev/null 2>&1 ; then
+    if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
+      echo "[INFO]Starting minikube cluster '$CLUSTER'"
+      minikube -p $CLUSTER start --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
+      minikube profile $CLUSTER
+      minikube -p $CLUSTER addons enable metrics-server
+      minikube -p $CLUSTER addons enable dashboard
+      # give it a few seconds to settle down
+      sleep 5
+    else
+      echo "[WARN]Minikube cluster '$CLUSTER' is already running. Not starting it again"
+    fi
+  else
+    echo "[WARN]Minikube not installed. Cannot start"
+  fi
 }
 
 function setupHelmAndOperator {
-	# sleep is needed or the cert manager will refuse connection and the install will fail
-	# if this is run too soon after an init it will fail because things are too busy
-	typeset operatorVersion
-	if [[ -z $KSBX_OPERATOR_VERSION ]]; then
-		operatorVersion=" "
-	else
-		operatorVersion="--version $KSBX_OPERATOR_VERSION"
-	fi
-	if which helm > /dev/null 2>&1; then
-		kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.8.0/cert-manager.yaml --wait
-		echo "[INFO]Sleeping for 30 seconds to allow the cert-manager to start, be patient"
-		sleep 30
-		kubectl create namespace tyk-operator-system
-		#kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
-		kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true"
-		helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
-		helm repo update
-		echo "[INFO]Attempting to deploy operator using helm. This may take a while"
-		if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system --atomic $operatorVersion; then
-			echo "[WARN]Operator install failed. Retrying, but only once"
-			kubectl delete ns tyk-operator-system --wait
-			kubectl create namespace tyk-operator-system
-			#kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
-			kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true"
-			sleep 10
-			echo "[INFO]Reattempting to deploy operator using helm. This may take a while"
-			if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system $operatorVersion; then
-				echo "[FATAL]Unable to deploy operator after two attempts, giving up"
-				exit 1
-			fi
-		fi
-		# successfully installed, show the version
-		if [[ $(helm list -n tyk-operator-system 2> /dev/null | awk '$1=="tyk-operator" {print $8}') = 'deployed' ]]; then
-			echo "[INFO]Version of the operator chart installed is $(helm list -n tyk-operator-system 2>/dev/null | awk '/tyk-operator/ {print $NF}')"
-		fi
-	else
-		echo "[FATAL]Helm not installed. Please install helm and retry"
-		exit 1
-	fi
+  # sleep is needed or the cert manager will refuse connection and the install will fail
+  # if this is run too soon after an init it will fail because things are too busy
+  typeset operatorVersion
+  if [[ -z $KSBX_OPERATOR_VERSION ]]; then
+    operatorVersion=" "
+  else
+    operatorVersion="--version $KSBX_OPERATOR_VERSION"
+  fi
+  if which helm > /dev/null 2>&1; then
+    kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.8.0/cert-manager.yaml --wait
+    echo "[INFO]Sleeping for 30 seconds to allow the cert-manager to start, be patient"
+    sleep 30
+    kubectl create namespace tyk-operator-system
+    #kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
+    kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true"
+    helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
+    helm repo update
+    echo "[INFO]Attempting to deploy operator using helm. This may take a while"
+    if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system --atomic $operatorVersion; then
+      echo "[WARN]Operator install failed. Retrying, but only once"
+      kubectl delete ns tyk-operator-system --wait
+      kubectl create namespace tyk-operator-system
+      #kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
+      kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true"
+      sleep 10
+      echo "[INFO]Reattempting to deploy operator using helm. This may take a while"
+      if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system $operatorVersion; then
+        echo "[FATAL]Unable to deploy operator after two attempts, giving up"
+        exit 1
+      fi
+    fi
+    # successfully installed, show the version
+    if [[ $(helm list -n tyk-operator-system 2> /dev/null | awk '$1=="tyk-operator" {print $8}') = 'deployed' ]]; then
+      echo "[INFO]Version of the operator chart installed is $(helm list -n tyk-operator-system 2>/dev/null | awk '/tyk-operator/ {print $NF}')"
+    fi
+  else
+    echo "[FATAL]Helm not installed. Please install helm and retry"
+    exit 1
+  fi
 }
 
 # I need to track down the YAML to do this and save it locally
 function setupIstio {
-	echo "[SORRY]Not implemented yet"
-	exit 0
+  echo "[SORRY]Not implemented yet"
+  exit 0
 }
 
 function getPodName {
-	kubectl get pods --no-headers=true -n $NAMESPACE | awk '/^'$1'/ {print $1}' | head -1
+  kubectl get pods --no-headers=true -n $NAMESPACE | awk '/^'$1'/ {print $1}' | head -1
 }
 
 # Wait for a deployment to be ready.
 function waitDeploymentReady {
-	typeset deploymentName
-	deploymentName=$1
-	if [[ -n $deploymentName ]]; then
-		if kubectl get deployment --no-headers=true -n $NAMESPACE $deploymentName > /dev/null 2>&1; then
-			echo -n "[INFO]Waiting for deployment $NAMESPACE:$deploymentName to be ready."
-			while [[ $( kubectl get deployment --no-headers=true -n $NAMESPACE $deploymentName | awk -F '[ /]+' 'BEGIN{allup=0} {up=$2 - $3; if (up != 0) {allup=up}}; END{print allup}' ) -ne 0 ]]; do
-				echo -n .
-				sleep 5
-			done
-		else
-			echo "[FATAL]Cannot find a deployment matching '$1'"
-			exit 1
-		fi
-	fi
-	echo " done"
+  typeset deploymentName
+  deploymentName=$1
+  if [[ -n $deploymentName ]]; then
+    if kubectl get deployment --no-headers=true -n $NAMESPACE $deploymentName > /dev/null 2>&1; then
+      echo -n "[INFO]Waiting for deployment $NAMESPACE:$deploymentName to be ready."
+      while [[ $( kubectl get deployment --no-headers=true -n $NAMESPACE $deploymentName | awk -F '[ /]+' 'BEGIN{allup=0} {up=$2 - $3; if (up != 0) {allup=up}}; END{print allup}' ) -ne 0 ]]; do
+        echo -n .
+        sleep 5
+      done
+    else
+      echo "[FATAL]Cannot find a deployment matching '$1'"
+      exit 1
+    fi
+  fi
+  echo " done"
 }
 
 # Wait for a pod to start (not used anymore)
 function waitPodReady {
-	typeset podName
-	podName=$(getPodName $1)
-	if [[ -n $podName ]]; then
-		echo -n "[INFO]Waiting for pod $NAMESPACE:$podName to be ready."
-		while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
-			echo -n .
-			sleep 5
-			if kubectl logs -n $NAMESPACE "$podName" 2>&1 | grep -q 'trying and failing to pull image'; then
-				echo; echo "[FATAL]Unable to pull image for '$podName'"
-				exit 1
-			fi
-			# Pending pods mean there aren't enough resources. Warn and exit
-			if kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | grep -qi 'pending'; then
-				# give it some time to find a place for the pod
-				sleep 5
-				if kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | grep -qi 'pending'; then
-					echo; echo "[FATAL]Not enough resources in the cluster to run $podName"
-					exit 1
-				fi
-			fi
-		done
-	else
-		echo "[FATAL]Cannot find a pod matching '$1'"
-		exit 1
-	fi
-	echo " done"
+  typeset podName
+  podName=$(getPodName $1)
+  if [[ -n $podName ]]; then
+    echo -n "[INFO]Waiting for pod $NAMESPACE:$podName to be ready."
+    while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
+      echo -n .
+      sleep 5
+      if kubectl logs -n $NAMESPACE "$podName" 2>&1 | grep -q 'trying and failing to pull image'; then
+        echo; echo "[FATAL]Unable to pull image for '$podName'"
+        exit 1
+      fi
+      # Pending pods mean there aren't enough resources. Warn and exit
+      if kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | grep -qi 'pending'; then
+        # give it some time to find a place for the pod
+        sleep 5
+        if kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | grep -qi 'pending'; then
+          echo; echo "[FATAL]Not enough resources in the cluster to run $podName"
+          exit 1
+        fi
+      fi
+    done
+  else
+    echo "[FATAL]Cannot find a pod matching '$1'"
+    exit 1
+  fi
+  echo " done"
 }
 
 # return the sandbox-details which is a summary saved when the sandbox is created
 function getDescription {
-	kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_DESCRIPTION
+  kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_DESCRIPTION
 }
 
 # hacky way to retrieve an admin user key from redis
 function getAdminUserKey {
-	typeset redisPort
-	typeset redisKey
-	redisPort=$(getControlRedisPort)
-	for redisKey in $(redis-cli -h $IP -p $redisPort --scan --pattern 'tyk-admin-api-*' 2> /dev/null ); do
-		if [[ $(redis-cli -h $IP -p $redisPort type $redisKey) == 'string' ]]; then
-			if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.user_permissions.IsAdmin) ]]; then
-				redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.access_key 
-				return 0
-			fi
-		fi
-	done
+  typeset redisPort
+  typeset redisKey
+  redisPort=$(getControlRedisPort)
+  for redisKey in $(redis-cli -h $IP -p $redisPort --scan --pattern 'tyk-admin-api-*' 2> /dev/null ); do
+    if [[ $(redis-cli -h $IP -p $redisPort type $redisKey) == 'string' ]]; then
+      if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.user_permissions.IsAdmin) ]]; then
+        redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.access_key 
+        return 0
+      fi
+    fi
+  done
 }
 
 function getOrgID {
-	curl -s -H "admin-auth: $KSBX_ADMIN_SECRET" http://$IP:$(getDashboardPort)/admin/organisations/ | jq -r .organisations[0].id
+  curl -s -H "admin-auth: $KSBX_ADMIN_SECRET" http://$IP:$(getDashboardPort)/admin/organisations/ | jq -r .organisations[0].id
 }
 
 function getPostgresPort {
-	typeset postgresService
-	postgresService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /postgres/ {print $1}' | head -1)
-	kubectl get svc -n $NAMESPACE postgres-db --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+  typeset postgresService
+  postgresService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /postgres/ {print $1}' | head -1)
+  kubectl get svc -n $NAMESPACE postgres-db --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getMongoPort {
-	typeset mongoService
-	mongoService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /mongo/ {print $1}' | head -1)
-	kubectl get svc -n $NAMESPACE mongo-db --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+  typeset mongoService
+  mongoService=$(kubectl get svc -n $NAMESPACE --no-headers=true | awk '$1 ~ /mongo/ {print $1}' | head -1)
+  kubectl get svc -n $NAMESPACE mongo-db --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getEdgeRedisPort {
-	kubectl get svc -n $NAMESPACE edge-redis --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+  kubectl get svc -n $NAMESPACE edge-redis --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getControlRedisPort {
-	kubectl get svc -n $NAMESPACE control-redis --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+  kubectl get svc -n $NAMESPACE control-redis --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getDashboardPort {
-	kubectl get svc -n $NAMESPACE tyk-dashboard --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+  kubectl get svc -n $NAMESPACE tyk-dashboard --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getControlGatewayPort {
-	kubectl get svc -n $NAMESPACE control-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+  kubectl get svc -n $NAMESPACE control-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getMDCBPort {
-	kubectl get svc -n $NAMESPACE tyk-sink --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+  kubectl get svc -n $NAMESPACE tyk-sink --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getEdgeGatewayPort {
-	kubectl get svc -n $NAMESPACE edge-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+  kubectl get svc -n $NAMESPACE edge-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function getStandaloneGatewayPort {
-	kubectl get svc -n $NAMESPACE standalone-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+  kubectl get svc -n $NAMESPACE standalone-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function reportSanboxInfo {
-	typeset https
-	echo "$NAMESPACE.Description:       $(getDescription)"
-	if [[ $KSBX_TYPE == 'pro'  || $KSBX_TYPE == 'mdcb' ]]; then
-		echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
-		echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
-		if [[ $KSBX_TYPE == "mdcb" ]]; then
-			echo "$NAMESPACE.MDCBport:          $IP:$(getMDCBPort)"
-			https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
-			if [[ $https == 'true' ]]; then
-				echo "$NAMESPACE.edge-gateway:      https://$IP:$(getEdgeGatewayPort)/"
-			else
-				echo "$NAMESPACE.edge-gateway:      http://$IP:$(getEdgeGatewayPort)/"
-			fi
-		fi
-		if [[ $KSBX_DATABASE == 'mongo' ]]; then
-			checkMongoShellInstalled
-			echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $IP --port $(getMongoPort)"
-		fi
-		if [[ $KSBX_DATABASE == 'postgres' ]]; then
-			echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$(getPostgresPort)"
-		fi
-		if [[ $KSBX_TYPE == "mdcb" ]]; then
-			echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $(getControlRedisPort)"
-			echo "$NAMESPACE.edge-redis:        redis-cli -h $IP -p $(getEdgeRedisPort)"
-		else
-			echo "$NAMESPACE.redis:             redis-cli -h $IP -p $(getControlRedisPort)"
-		fi
-		echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
-		echo "$NAMESPACE.OrgID:             $(getOrgID)"
-	else
-		echo "$NAMESPACE.gateway:   http://$IP:$(getStandaloneGatewayPort)/"
-		echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getControlRedisPort)"
-	fi
-	# if the namespace has the label 'istio-injection=enabled' then report the istio-system services
-	if kubectl get ns --show-labels --no-headers=true $NAMESPACE | grep -q $ISTIO_INJECTION_LABEL; then
-		echo "Kiali:                        http://$IP:$(kubectl get svc -n istio-system kiali --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
-		echo "Grafana:                      http://$IP:$(kubectl get svc -n istio-system grafana --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
-		echo "Tracing:                      http://$IP:$(kubectl get svc -n istio-system tracing --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
-	fi
+  typeset https
+  echo "$NAMESPACE.Description:       $(getDescription)"
+  if [[ $KSBX_TYPE == 'pro'  || $KSBX_TYPE == 'mdcb' ]]; then
+    echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
+    echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
+    if [[ $KSBX_TYPE == "mdcb" ]]; then
+      echo "$NAMESPACE.MDCBport:          $IP:$(getMDCBPort)"
+      https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
+      if [[ $https == 'true' ]]; then
+        echo "$NAMESPACE.edge-gateway:      https://$IP:$(getEdgeGatewayPort)/"
+      else
+        echo "$NAMESPACE.edge-gateway:      http://$IP:$(getEdgeGatewayPort)/"
+      fi
+    fi
+    if [[ $KSBX_DATABASE == 'mongo' ]]; then
+      checkMongoShellInstalled
+      echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $IP --port $(getMongoPort)"
+    fi
+    if [[ $KSBX_DATABASE == 'postgres' ]]; then
+      echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$(getPostgresPort)"
+    fi
+    if [[ $KSBX_TYPE == "mdcb" ]]; then
+      echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $(getControlRedisPort)"
+      echo "$NAMESPACE.edge-redis:        redis-cli -h $IP -p $(getEdgeRedisPort)"
+    else
+      echo "$NAMESPACE.redis:             redis-cli -h $IP -p $(getControlRedisPort)"
+    fi
+    echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
+    echo "$NAMESPACE.OrgID:             $(getOrgID)"
+  else
+    echo "$NAMESPACE.gateway:   http://$IP:$(getStandaloneGatewayPort)/"
+    echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getControlRedisPort)"
+  fi
+  # if the namespace has the label 'istio-injection=enabled' then report the istio-system services
+  if kubectl get ns --show-labels --no-headers=true $NAMESPACE | grep -q $ISTIO_INJECTION_LABEL; then
+    echo "Kiali:                        http://$IP:$(kubectl get svc -n istio-system kiali --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
+    echo "Grafana:                      http://$IP:$(kubectl get svc -n istio-system grafana --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
+    echo "Tracing:                      http://$IP:$(kubectl get svc -n istio-system tracing --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
+  fi
 }
 
 # create a namespace for the sandbox and save labels that say what it's for etc.
 # these labels are used internally and are also helpful for remembering why you created the sandbox
 function createNamespace {
-	typeset configYAML
-	configYAML=$(mktemp /tmp/configYAML.yaml.XXXX)
-	if ! namespaceExists $NAMESPACE; then
-		echo "[INFO]kubectl create ns $NAMESPACE"
-		kubectl create ns $NAMESPACE
-		echo "[INFO]kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR_LABEL $EXTRA_NAMESPACE_LABELS"
-		kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR_LABEL $EXTRA_NAMESPACE_LABELS
-		# setup config map in the new namespace with the details of the deployment
-		echo "apiVersion: v1" > $configYAML
-		echo "data:" >> $configYAML
-		if [[ -n $sandboxVersion ]]; then
-			echo "  KSBX_VERSION: $sandboxVersion" >> $configYAML
-		fi
-		if [[ -n $KSBX_GATE_VERS ]]; then
-			echo "  KSBX_GW: $KSBX_GATE_VERS" >> $configYAML
-		fi
-		if [[ -n $KSBX_DASH_VERS ]]; then
-			echo "  KSBX_DB: $KSBX_DASH_VERS" >> $configYAML
-		fi
-		if [[ -n $KSBX_PUMP_VERS ]]; then
-			echo "  KSBX_PMP: $KSBX_PUMP_VERS" >> $configYAML
-		fi
-		if [[ -n $KSBX_MDCB_VERS ]]; then
-			echo "  KSBX_MDCB: $KSBX_MDCB_VERS" >> $configYAML
-		fi
-		echo "  KSBX_TYPE: $KSBX_TYPE" >> $configYAML
-		echo "  KSBX_DATABASE: $KSBX_DATABASE" >> $configYAML
-		echo "  KSBX_DESCRIPTION: \"$KSBX_DESCRIPTION\"" >> $configYAML
-		echo "kind: ConfigMap" >> $configYAML
-		echo "metadata:" >> $configYAML
-		echo "  namespace: \"$NAMESPACE\"" >> $configYAML
-		echo "  name: sandbox-details" >> $configYAML
-		kubectl apply -f $configYAML -n $NAMESPACE
-		echo "[INFO]Created namespace '$NAMESPACE'"
-	fi
-	rm -f $configYAML
+  typeset configYAML
+  configYAML=$(mktemp /tmp/configYAML.yaml.XXXX)
+  if ! namespaceExists $NAMESPACE; then
+    echo "[INFO]kubectl create ns $NAMESPACE"
+    kubectl create ns $NAMESPACE
+    echo "[INFO]kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR_LABEL $EXTRA_NAMESPACE_LABELS"
+    kubectl label ns $NAMESPACE $NAMESPACE_SELECTOR_LABEL $EXTRA_NAMESPACE_LABELS
+    # setup config map in the new namespace with the details of the deployment
+    echo "apiVersion: v1" > $configYAML
+    echo "data:" >> $configYAML
+    if [[ -n $sandboxVersion ]]; then
+      echo "  KSBX_VERSION: $sandboxVersion" >> $configYAML
+    fi
+    if [[ -n $KSBX_GATE_VERS ]]; then
+      echo "  KSBX_GW: $KSBX_GATE_VERS" >> $configYAML
+    fi
+    if [[ -n $KSBX_DASH_VERS ]]; then
+      echo "  KSBX_DB: $KSBX_DASH_VERS" >> $configYAML
+    fi
+    if [[ -n $KSBX_PUMP_VERS ]]; then
+      echo "  KSBX_PMP: $KSBX_PUMP_VERS" >> $configYAML
+    fi
+    if [[ -n $KSBX_MDCB_VERS ]]; then
+      echo "  KSBX_MDCB: $KSBX_MDCB_VERS" >> $configYAML
+    fi
+    echo "  KSBX_TYPE: $KSBX_TYPE" >> $configYAML
+    echo "  KSBX_DATABASE: $KSBX_DATABASE" >> $configYAML
+    echo "  KSBX_DESCRIPTION: \"$KSBX_DESCRIPTION\"" >> $configYAML
+    echo "kind: ConfigMap" >> $configYAML
+    echo "metadata:" >> $configYAML
+    echo "  namespace: \"$NAMESPACE\"" >> $configYAML
+    echo "  name: sandbox-details" >> $configYAML
+    kubectl apply -f $configYAML -n $NAMESPACE
+    echo "[INFO]Created namespace '$NAMESPACE'"
+  fi
+  rm -f $configYAML
 }
 
 function namespaceExists {
-	typeset namespace
-	typeset ns
-	namespace=$1
-	for ns in $(kubectl get namespaces --no-headers=true | awk '{print $1}'); do
-		if [[ "$ns" == $namespace ]]; then
-			return 0
-		fi
-	done
-	return 1
+  typeset namespace
+  typeset ns
+  namespace=$1
+  for ns in $(kubectl get namespaces --no-headers=true | awk '{print $1}'); do
+    if [[ "$ns" == $namespace ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 function CrdExists {
-	typeset namespace
-	typeset CRD
-	typeset CrdCount
-	namespace=$1
-	CRD=$2
-	CrdCount=0
-	if kubectl get crd -n $namespace --no-headers=true | grep -q "$CRD"; then
-		if [[ $(kubectl get $CRD -n $namespace --no-headers=true 2>&- | wc -l) -gt 0 ]]
-		then
-			return 0
-		fi
-	fi
-	return 1
+  typeset namespace
+  typeset CRD
+  typeset CrdCount
+  namespace=$1
+  CRD=$2
+  CrdCount=0
+  if kubectl get crd -n $namespace --no-headers=true | grep -q "$CRD"; then
+    if [[ $(kubectl get $CRD -n $namespace --no-headers=true 2>&- | wc -l) -gt 0 ]]
+    then
+      return 0
+    fi
+  fi
+  return 1
 }
 
 function MaskOperatorContext {
-	typeset namespace
-	namespace=$1
-	if CrdExists $namespace operatorcontexts.tyk.tyk.io; then
-		kubectl get operatorcontext $OPERATOR_CONTEXT_NAME -n $namespace -o yaml | yq '.spec.env.url = "'$OPERATOR_MASK_URL'"' | kubectl apply -n $namespace -f -
-	fi
+  typeset namespace
+  namespace=$1
+  if CrdExists $namespace operatorcontexts.tyk.tyk.io; then
+    kubectl get operatorcontext $OPERATOR_CONTEXT_NAME -n $namespace -o yaml | yq '.spec.env.url = "'$OPERATOR_MASK_URL'"' | kubectl apply -n $namespace -f -
+  fi
 }
 
 function RemoveTykCRDs {
-	typeset namespace
-	typeset CRD
-	namespace=$1
-	for CRD in portalapicatalogues apidescriptions securitypolicies apidefinitions supergraphs subgraphs portalconfigs; do
-		if CrdExists $namespace $CRD; then
-			echo "[INFO]Removing all $CRD from $namespace"
-			kubectl delete $CRD --all -n $namespace
-		fi
-	done
+  typeset namespace
+  typeset CRD
+  namespace=$1
+  for CRD in portalapicatalogues apidescriptions securitypolicies apidefinitions supergraphs subgraphs portalconfigs; do
+    if CrdExists $namespace $CRD; then
+      echo "[INFO]Removing all $CRD from $namespace"
+      kubectl delete $CRD --all -n $namespace
+    fi
+  done
 }
 
 function OperatorContextExists {
-	if CrdExists $1 operatorcontexts.tyk.tyk.io
-	then
-		return 0
-	fi
-	return 1
+  if CrdExists $1 operatorcontexts.tyk.tyk.io
+  then
+    return 0
+  fi
+  return 1
 }
 
 # Process the YAML with envsubst to substitute environment variables into them
@@ -627,936 +629,1005 @@ function OperatorContextExists {
 # KSBX_MDCB_VERS which has the MDCB version. This is used to pull the MDCB docker image
 # KSBX_NS which is the namespace for the pods etc.
 function applyYAMLtemplate {
-	typeset YAMLfile
-	typeset tmpYamlFile
-	for YAMLfile in $*; do
-		YAMLfile=$(basename $YAMLfile)
-		tmpYamlFile=$(mktemp /tmp/XXXXX-$YAMLfile)
-		if [[ -f $YAMLDIR/$YAMLfile ]]; then
-			cat $YAMLDIR/$YAMLfile | envsubst > $tmpYamlFile
-			if [[ -n $ENV_VAR_FILE ]]; then
-				if grep -qw 'kind: Deployment' $tmpYamlFile; then
-					addEnvVars $tmpYamlFile
-				fi
-			fi
-			kubectl apply -n $NAMESPACE -f $tmpYamlFile
-		fi
-		#rm -f $tmpYamlFile
-	done
+  typeset YAMLfile
+  typeset tmpYamlFile
+  for YAMLfile in $*; do
+    YAMLfile=$(basename $YAMLfile)
+    tmpYamlFile=$(mktemp /tmp/XXXXX-$YAMLfile)
+    if [[ -f $YAMLDIR/$YAMLfile ]]; then
+      cat $YAMLDIR/$YAMLfile | envsubst > $tmpYamlFile
+      if [[ -n $ENV_VAR_FILE ]]; then
+        if grep -qw 'kind: Deployment' $tmpYamlFile; then
+          addEnvVars $tmpYamlFile
+        fi
+      fi
+      kubectl apply -n $NAMESPACE -f $tmpYamlFile
+    fi
+    #rm -f $tmpYamlFile
+  done
 }
 
 function addEnvVars {
-	typeset YAMLfile
-	typeset VAR
-	typeset VALUE
-	typeset line
-	YAMLfile=$1
-	yq eval '(.spec.template.spec.containers[0].envFrom) += [{"configMapRef": {"name": "sandbox-env-vars"}}]' -i $YAMLfile
+  typeset YAMLfile
+  typeset VAR
+  typeset VALUE
+  typeset line
+  YAMLfile=$1
+  yq eval '(.spec.template.spec.containers[0].envFrom) += [{"configMapRef": {"name": "sandbox-env-vars"}}]' -i $YAMLfile
 }
 
 # apply the licence to the dashboard
 function licenseDashboard {
-	if [[ -n $SBX_LICENSE ]]; then
-		echo "[INFO]Licensing the dashboard"
-		curl -s -d "license=$SBX_LICENSE" http://$IP:$(getDashboardPort)/license > /dev/null
-	fi
+  if [[ -n $SBX_LICENSE ]]; then
+    echo "[INFO]Licensing the dashboard"
+    curl -s -d "license=$SBX_LICENSE" http://$IP:$(getDashboardPort)/license > /dev/null
+  fi
 }
 
 # add the user and set their password
 function addDashboardUser {
-	if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
-		SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
-		# this bootstrap method is reliable for versions 2.9.x - 3.2.x (won't work on 2.8.x or earlier)
-		echo "[INFO]Adding admin account $SBX_USER"
-		curl -s -d "email_address=$SBX_USER&first_name=Tyk&last_name=Admin&password=$SBX_CLEAR_PASSWORD&confirm_password=$SBX_CLEAR_PASSWORD" http://$IP:$(getDashboardPort)/bootstrap > /dev/null
-	fi
+  if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
+    SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
+    # this bootstrap method is reliable for versions 2.9.x - 3.2.x (won't work on 2.8.x or earlier)
+    echo "[INFO]Adding admin account $SBX_USER"
+    curl -s -d "email_address=$SBX_USER&first_name=Tyk&last_name=Admin&password=$SBX_CLEAR_PASSWORD&confirm_password=$SBX_CLEAR_PASSWORD" http://$IP:$(getDashboardPort)/bootstrap > /dev/null
+  fi
 }
 
 # not used. Not sure why
 function addAPIs {
-	if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
-		# only attempt if we've got a username and password because we need a auth ID
-		:
-	fi
+  if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
+    # only attempt if we've got a username and password because we need a auth ID
+    :
+  fi
 }
 
 function listPods {
-	kubectl get pods -n $NAMESPACE
+  kubectl get pods -n $NAMESPACE
 }
 
 # check if we're on Mongodb or Postgresql
 function getDatabaseType {
-	KSBX_DATABASE=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_DATABASE)
+  KSBX_DATABASE=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_DATABASE)
 }
 
 # is this a pro install or standalone
 function getInstallType {
-	KSBX_TYPE=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_TYPE)
+  KSBX_TYPE=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_TYPE)
 }
 
 # report the tyk versions saved in the namespace configmap sandbox-details when it was created
 function showTykVersions {
-	typeset key; typeset value; typeset report; typeset sandboxDetails; typeset description
-	sandboxDetails=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data)
-	report=''
-	for key in KSBX_DATABASE KSBX_MDCB KSBX_PMP KSBX_GW KSBX_DB KSBX_TYPE KSBX_VERSION; do
-		value=$(echo $sandboxDetails | jq -r .$key)
-		if [[ $value != 'null' ]]; then
-			report="$report $key=$value"
-		fi
-	done
-	echo $report
+  typeset key; typeset value; typeset report; typeset sandboxDetails; typeset description
+  sandboxDetails=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data)
+  report=''
+  for key in KSBX_DATABASE KSBX_MDCB KSBX_PMP KSBX_GW KSBX_DB KSBX_TYPE KSBX_VERSION; do
+    value=$(echo $sandboxDetails | jq -r .$key)
+    if [[ $value != 'null' ]]; then
+      report="$report $key=$value"
+    fi
+  done
+  echo $report
 }
 
 # read the versions file and create an array of associated versions
 # isolated to keep IFS from leaking
 function loadVersions {
-	typeset line
-	typeset IFS
-	typeset gwVers
-	typeset dshbVers
-	typeset pumpVers
-	typeset TIBvers
-	typeset syncVers
-	typeset MDCBvers
-	typeset version
-	line=$1
-	IFS=,
-	echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers MDCBvers
-	export KSBX_GATE_VERS="v${gwVers%%-*}"
-	KSBX_GATE_VERS=$(echo $KSBX_GATE_VERS | sed 's/~/-/g')
-	if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
-		export KSBX_DASH_VERS="v${dshbVers%%-*}"
-		export KSBX_PUMP_VERS="v${pumpVers%%-*}"
-		if [[ $KSBX_TYPE == 'mdcb' ]]; then
-			export KSBX_MDCB_VERS="v${MDCBvers%%-*}"
-		fi
-	fi
+  typeset line
+  typeset IFS
+  typeset gwVers
+  typeset dshbVers
+  typeset pumpVers
+  typeset TIBvers
+  typeset syncVers
+  typeset MDCBvers
+  typeset version
+  line=$1
+  IFS=,
+  echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers MDCBvers
+  export KSBX_GATE_VERS="v${gwVers%%-*}"
+  KSBX_GATE_VERS=$(echo $KSBX_GATE_VERS | sed 's/~/-/g')
+  if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
+    export KSBX_DASH_VERS="v${dshbVers%%-*}"
+    export KSBX_PUMP_VERS="v${pumpVers%%-*}"
+    if [[ $KSBX_TYPE == 'mdcb' ]]; then
+      export KSBX_MDCB_VERS="v${MDCBvers%%-*}"
+    fi
+  fi
 }
 
 # spawn a shell in a pod
 function runShell {
-	typeset podPartName
-	typeset pod
-	for podPartName in $*
-	do
-		echo "[INFO]Creating shell for $podPartName"
-		for pod in $(kubectl get pods -n $NAMESPACE | awk '/'$podPartName'/ {print $1}')
-		do
-			# if ncurses-base isnt installed then TERM isn't recognised
-			# I found it was installed in some images but not others
-			echo "[INFO]Checking for ncurses-base in $pod"
-			if ! kubectl exec $pod -n $NAMESPACE -- test -d /lib/terminfo >/dev/null 2>&1; then
-				echo "[INFO]Installing ncurses-base to provide terminal types to the shell"
-				kubectl exec $pod -n $NAMESPACE -- apt-get update > /dev/null 2>&1
-				kubectl exec $pod -n $NAMESPACE -- apt install ncurses-base -y > /dev/null 2>&1
-			fi
-			echo "[INFO]starting bash in $pod"
-			echo "[INFO]kubectl exec $pod -n $NAMESPACE -it -- /bin/bash"
-			kubectl exec $pod -n $NAMESPACE -it -- /bin/bash
-		done
-	done
+  typeset podPartName
+  typeset pod
+  for podPartName in $*
+  do
+    echo "[INFO]Creating shell for $podPartName"
+    for pod in $(kubectl get pods -n $NAMESPACE | awk '/'$podPartName'/ {print $1}')
+    do
+      # if ncurses-base isnt installed then TERM isn't recognised
+      # I found it was installed in some images but not others
+      echo "[INFO]Checking for ncurses-base in $pod"
+      if ! kubectl exec $pod -n $NAMESPACE -- test -d /lib/terminfo >/dev/null 2>&1; then
+        echo "[INFO]Installing ncurses-base to provide terminal types to the shell"
+        kubectl exec $pod -n $NAMESPACE -- apt-get update > /dev/null 2>&1
+        kubectl exec $pod -n $NAMESPACE -- apt install ncurses-base -y > /dev/null 2>&1
+      fi
+      echo "[INFO]starting bash in $pod"
+      echo "[INFO]kubectl exec $pod -n $NAMESPACE -it -- /bin/bash"
+      kubectl exec $pod -n $NAMESPACE -it -- /bin/bash
+    done
+  done
 }
 
 # tail the pods logs
 function showLogs {
-	typeset podPartName
-	typeset pod
-	podPartName=$1
-	pod=$(kubectl get pods -n $NAMESPACE | awk '/'$podPartName'/ {print $1}' | head -1)
-	if [[ -n $pod ]]; then
-		echo "[INFO]kubectl logs -n $NAMESPACE $pod -f"
-		kubectl logs -n $NAMESPACE $pod -f
-	else
-		echo "[FATAL]'$podPartName' not found in namespace $NAMESPACE"
-		kubectl get pods -n $NAMESPACE
-	fi
+  typeset podPartName
+  typeset pod
+  podPartName=$1
+  pod=$(kubectl get pods -n $NAMESPACE | awk '/'$podPartName'/ {print $1}' | head -1)
+  if [[ -n $pod ]]; then
+    echo "[INFO]kubectl logs -n $NAMESPACE $pod -f"
+    kubectl logs -n $NAMESPACE $pod -f
+  else
+    echo "[FATAL]'$podPartName' not found in namespace $NAMESPACE"
+    kubectl get pods -n $NAMESPACE
+  fi
 }
 
 # Hybrid needs to be enabled for MDCB installs
 function enableHybrid {
-	typeset orgID
-	typeset adminSecret
-	typeset dashboardPort
-	typeset orgJSON
-	dashboardPort=$(getDashboardPort)
-	orgID=$1
-	echo "[INFO]Enabling hybrid on org_id $orgID"
-	orgJSON=$(curl -s http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" | jq ".hybrid_enabled = true")
-	curl -sX PUT http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" -d "$orgJSON"
+  typeset orgID
+  typeset adminSecret
+  typeset dashboardPort
+  typeset orgJSON
+  dashboardPort=$(getDashboardPort)
+  orgID=$1
+  echo "[INFO]Enabling hybrid on org_id $orgID"
+  orgJSON=$(curl -s http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" | jq ".hybrid_enabled = true")
+  curl -sX PUT http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" -d "$orgJSON"
 }
 
 # create a self signed certificate, load it into the certificate store and apply the config to the edge gateways
 function enableEdgeHttps {
-	checkCommandInstalled openssl
-	typeset adminKey
-	typeset certID
-	typeset DashboardPort
-	typeset DASH_URL
-	typeset GW_KEY_FILE
-	typeset GW_CRT_FILE
-	typeset GW_CSR_FILE
-	typeset GW_EXT_FILE
-	typeset SAN
-	typeset SUBJECT
-	echo "[INFO]Deploying self signed certificate to the edge gateway"
-	DASH_URL=http://$IP:$(getDashboardPort)
-	adminKey=$(getAdminUserKey)
-	# add a label to the deployment to show that it's https
-	kubectl label deployment edge-gateway https=true -n $NAMESPACE
-	# generate the edge gateway certificate
-	SAN="DNS:localhost, DNS:*.$NAMESPACE.svc.cluster.local"
-	SUBJECT="/emailAddress=email@company.com/C=GB/ST=K8s Sandbox/L=$(date +"%Y-%b-%d %T %Z")/O=Support/OU=Team/CN=$NAMESPACE"
-	GW_KEY_FILE=$(mktemp /tmp/XXXXX-gateway-key.pem)
-	GW_CRT_FILE=$(mktemp /tmp/XXXXX-gateway-certificate.pem)
-	GW_CSR_FILE=$(mktemp /tmp/XXXXX-certificate.csr)
-	GW_EXT_FILE=$(mktemp /tmp/XXXXX-extfile.ext)
-	openssl genrsa -des3 -passout pass:ABC-123 -out $GW_KEY_FILE 2048
-	openssl req -new -key $GW_KEY_FILE -passin pass:ABC-123 -subj "$SUBJECT" -out $GW_CSR_FILE
-	cp $GW_KEY_FILE ${GW_KEY_FILE}.orig
-	openssl rsa -in ${GW_KEY_FILE}.orig -out $GW_KEY_FILE -passin pass:ABC-123
-	rm -f ${GW_KEY_FILE}.orig
-	cat > $GW_EXT_FILE <<- EOF
-		subjectKeyIdentifier   = hash
-		authorityKeyIdentifier = keyid:always,issuer:always
-		basicConstraints       = CA:TRUE
-		keyUsage               = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment, keyAgreement, keyCertSign
-		subjectAltName         = $SAN
-		issuerAltName          = issuer:copy
-	EOF
-	openssl x509 -req -in $GW_CSR_FILE -signkey $GW_KEY_FILE -out $GW_CRT_FILE -days 3650 -sha256 -extfile $GW_EXT_FILE
-	cat $GW_KEY_FILE >> $GW_CRT_FILE
-	# add the certificate to the dashboard
-	certID=$(curl -sH "Authorization: $adminKey" "$DASH_URL/api/certs" --form "data=@$GW_CRT_FILE;type=text/plain" | jq -r .id)
-	rm -f $GW_KEY_FILE $GW_CSR_FILE $GW_EXT_FILE $GW_CRT_FILE $GW_CRT_FILE
-	kubectl get deploy edge-gateway -n $NAMESPACE -o yaml | yq eval \
-		'(.spec.template.spec.containers[0].env += { "name": "TYK_GW_HTTPSERVEROPTIONS_USESSL", "value": "True"}) |
-		(.spec.template.spec.containers[0].env += { "name": "TYK_GW_HTTPSERVEROPTIONS_SSLCERTIFICATES", "value": "'$certID'"}) |
-		(.spec.template.spec.containers[0].readinessProbe.httpGet.scheme = "HTTPS") |
-		(.spec.template.spec.containers[0].livenessProbe.httpGet.scheme = "HTTPS")' \
-		| kubectl apply -f -
-}
+  checkCommandInstalled openssl
+  typeset adminKey
+  typeset certID
+  typeset DashboardPort
+  typeset DASH_URL
+  typeset GW_KEY_FILE
+  typeset GW_CRT_FILE
+  typeset GW_CSR_FILE
+  typeset GW_EXT_FILE
+  typeset SAN
+  typeset SUBJECT
+  echo "[INFO]Deploying self signed certificate to the edge gateway"
+  DASH_URL=http://$IP:$(getDashboardPort)
+  adminKey=$(getAdminUserKey)
+  # add a label to the deployment to show that it's https
+  kubectl label deployment edge-gateway https=true -n $NAMESPACE
+  # generate the edge gateway certificate
+  SAN="DNS:localhost, DNS:*.$NAMESPACE.svc.cluster.local"
+  SUBJECT="/emailAddress=email@company.com/C=GB/ST=K8s Sandbox/L=$(date +"%Y-%b-%d %T %Z")/O=Support/OU=Team/CN=$NAMESPACE"
+  GW_KEY_FILE=$(mktemp /tmp/XXXXX-gateway-key.pem)
+  GW_CRT_FILE=$(mktemp /tmp/XXXXX-gateway-certificate.pem)
+  GW_CSR_FILE=$(mktemp /tmp/XXXXX-certificate.csr)
+  GW_EXT_FILE=$(mktemp /tmp/XXXXX-extfile.ext)
+  openssl genrsa -des3 -passout pass:ABC-123 -out $GW_KEY_FILE 2048
+  openssl req -new -key $GW_KEY_FILE -passin pass:ABC-123 -subj "$SUBJECT" -out $GW_CSR_FILE
+  cp $GW_KEY_FILE ${GW_KEY_FILE}.orig
+  openssl rsa -in ${GW_KEY_FILE}.orig -out $GW_KEY_FILE -passin pass:ABC-123
+  rm -f ${GW_KEY_FILE}.orig
+  cat > $GW_EXT_FILE <<- EOF
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints       = CA:TRUE
+keyUsage               = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment, keyAgreement, keyCertSign
+subjectAltName         = $SAN
+issuerAltName          = issuer:copy
+EOF
+
+  openssl x509 -req -in $GW_CSR_FILE -signkey $GW_KEY_FILE -out $GW_CRT_FILE -days 3650 -sha256 -extfile $GW_EXT_FILE
+  cat $GW_KEY_FILE >> $GW_CRT_FILE
+  # add the certificate to the dashboard
+  certID=$(curl -sH "Authorization: $adminKey" "$DASH_URL/api/certs" --form "data=@$GW_CRT_FILE;type=text/plain" | jq -r .id)
+  rm -f $GW_KEY_FILE $GW_CSR_FILE $GW_EXT_FILE $GW_CRT_FILE $GW_CRT_FILE
+  kubectl get deploy edge-gateway -n $NAMESPACE -o yaml | yq eval \
+    '(.spec.template.spec.containers[0].env += { "name": "TYK_GW_HTTPSERVEROPTIONS_USESSL", "value": "True"}) |
+    (.spec.template.spec.containers[0].env += { "name": "TYK_GW_HTTPSERVEROPTIONS_SSLCERTIFICATES", "value": "'$certID'"}) |
+    (.spec.template.spec.containers[0].readinessProbe.httpGet.scheme = "HTTPS") |
+    (.spec.template.spec.containers[0].livenessProbe.httpGet.scheme = "HTTPS")' \
+    | kubectl apply -f -
+  }
 
 # Sometimes PersistentVolumeClaim are left when the namespace is deleted.
 # Tidy up any in state 'Released'
 # This happens most when minikube is stopped and restarted
 function tidyPVCs {
-	typeset pvc
-	for pvc in $(kubectl get pv --no-headers=true 2>/dev/null | awk '$5=="Released" {print $1}'); do
-		echo "[INFO]kubectl delete pv $pvc"
-		kubectl delete pv $pvc
-	done
+  typeset pvc
+  for pvc in $(kubectl get pv --no-headers=true 2>/dev/null | awk '$5=="Released" {print $1}'); do
+    echo "[INFO]kubectl delete pv $pvc"
+    kubectl delete pv $pvc
+  done
 }
 
 # converts API definition format from the one given using 'export' on the dashboard to the one expected when importing via /api/apis
 function createApiDefintion {
-	typeset APIfile
-	APIfile="$1"
-	echo '{'
-	echo '  "api_model": {},'
-	echo '  "api_definition":' $(<"$APIfile") ','
-	echo '  "hook_references": [],'
-	echo '  "is_site": false,'
-	echo '  "sort_by": 0'
-	echo '}'
+  typeset APIfile
+  APIfile="$1"
+  echo '{'
+  echo '  "api_model": {},'
+  echo '  "api_definition":' $(<"$APIfile") ','
+  echo '  "hook_references": [],'
+  echo '  "is_site": false,'
+  echo '  "sort_by": 0'
+  echo '}'
 }
 
 # inject an API definition into a running sandbox
 function publishAPIs {
-	typeset APIfile
-	if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
-		typeset adminKey
-		typeset DashboardPort
-		adminKey=$(getAdminUserKey)
-		DashboardPort=$(getDashboardPort)
-		if [[ -n $adminKey ]]; then
-			for APIfile in "$@"; do
-				echo "[INFO]Publishing API $APIfile"
-				if grep -q api_definition "$APIfile"; then
-					# deal with the files that are a copy and paste of the API JSON from the dashboard
-					curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfile"
-				else
-					# deal with the files that are exported APIs from the dashboard
-					APIfileName=$(mktemp /tmp/$(basename "$APIfile").XXXXXX)
-					createApiDefintion "$APIfile" > $APIfileName
-					curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfileName" 
-					\rm $APIfileName
-				fi
-			done
-		fi
-	else
-		# stand alone (ce)
-		typeset gatewaySecret
-		typeset gatewayPort
-		typeset APIs
-		typeset API
-		gatewaySecret=Secret
-		gatewayPort=$(getStandaloneGatewayPort)
-		APIs=""
-		API=""
-		# load the APIs
-		for APIfile in "$@"; do
-			echo "[INFO]Publishing API $APIfile"
-			curl -sH "x-tyk-authorization: $gatewaySecret" -d @$APIfile http://$IP:$gatewayPort/tyk/apis
-			echo "[INFO]Hot reloading the gateway"
-			curl -sH "x-tyk-authorization: $gatewaySecret" http://$IP:$gatewayPort/tyk/reload/group
-		done
-		# report on APIs reloaded
-		sleep 10
-		curl -sH "x-tyk-authorization: $gatewaySecret" http://$IP:$gatewayPort/tyk/apis | jq -r '.[].name' | while read API; do
-			APIs="'$API' $APIs"
-		done
-		if [[ -n $APIs ]]; then
-			echo "[INFO]Apis published: $APIs"
-		fi
-	fi
+  typeset APIfile
+  if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
+    typeset adminKey
+    typeset DashboardPort
+    adminKey=$(getAdminUserKey)
+    DashboardPort=$(getDashboardPort)
+    if [[ -n $adminKey ]]; then
+      for APIfile in "$@"; do
+        echo "[INFO]Publishing API $APIfile"
+        if grep -q api_definition "$APIfile"; then
+          # deal with the files that are a copy and paste of the API JSON from the dashboard
+          curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfile"
+        else
+          # deal with the files that are exported APIs from the dashboard
+          APIfileName=$(mktemp /tmp/$(basename "$APIfile").XXXXXX)
+          createApiDefintion "$APIfile" > $APIfileName
+          curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfileName" 
+          \rm $APIfileName
+        fi
+      done
+    fi
+  else
+    # stand alone (ce)
+    typeset gatewaySecret
+    typeset gatewayPort
+    typeset APIs
+    typeset API
+    gatewaySecret=Secret
+    gatewayPort=$(getStandaloneGatewayPort)
+    APIs=""
+    API=""
+    # load the APIs
+    for APIfile in "$@"; do
+      echo "[INFO]Publishing API $APIfile"
+      curl -sH "x-tyk-authorization: $gatewaySecret" -d @$APIfile http://$IP:$gatewayPort/tyk/apis
+      echo "[INFO]Hot reloading the gateway"
+      curl -sH "x-tyk-authorization: $gatewaySecret" http://$IP:$gatewayPort/tyk/reload/group
+    done
+    # report on APIs reloaded
+    sleep 10
+    curl -sH "x-tyk-authorization: $gatewaySecret" http://$IP:$gatewayPort/tyk/apis | jq -r '.[].name' | while read API; do
+      APIs="'$API' $APIs"
+    done
+    if [[ -n $APIs ]]; then
+      echo "[INFO]Apis published: $APIs"
+    fi
+  fi
 }
 
 # Create an operator context in the sandbox
 function deployOperatorContext {
-	typeset adminKey
-	typeset orgid
-	typeset OperatorContextYAML
-	OperatorContextYAML=$(mktemp /tmp/operatorContext.yaml.XXXX)
-	if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
-		# Dashboard (pro) install
-		typeset dashURL
-		adminkey=$(getAdminUserKey)
-		dashURL="http://$IP:$(getDashboardPort)/"
-		orgid=$(getOrgID)
-		echo "Deploying operator context into new Pro sandbox"
-		echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
-		echo "kind: OperatorContext" >> $OperatorContextYAML
-		echo "metadata:" >> $OperatorContextYAML
-		echo "  name: $OPERATOR_CONTEXT_NAME" >> $OperatorContextYAML
-		echo "spec:" >> $OperatorContextYAML
-		echo "  env:" >> $OperatorContextYAML
-		echo "    mode: pro" >> $OperatorContextYAML
-		echo "    auth: $adminkey" >> $OperatorContextYAML
-		echo "    org: $orgid" >> $OperatorContextYAML
-		echo "    url: $dashURL" >> $OperatorContextYAML
-		echo "    insecureSkipVerify: true" >> $OperatorContextYAML
-		echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
-		kubectl apply -f $OperatorContextYAML -n $NAMESPACE
-		rm -f $OperatorContextYAML
-	else
-		# stand alone (CE) deployment
-		typeset gatewaySecret
-		typeset gatewayURL
-		gatewaySecret=Secret
-		gatewayURL="http://$IP:$(getStandaloneGatewayPort)/"
-		echo "Deploying operator context into new CE sandbox"
-		echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
-		echo "kind: OperatorContext" >> $OperatorContextYAML
-		echo "metadata:" >> $OperatorContextYAML
-		echo "  name: $OPERATOR_CONTEXT_NAME" >> $OperatorContextYAML
-		echo "spec:" >> $OperatorContextYAML
-		echo "  env:" >> $OperatorContextYAML
-		echo "    mode: ce" >> $OperatorContextYAML
-		echo "    auth: $gatewaySecret" >> $OperatorContextYAML
-		echo "    org: $NAMESPACE" >> $OperatorContextYAML # use the namespace as the org since it's free form with CE
-		echo "    url: $gatewayURL" >> $OperatorContextYAML
-		echo "    insecureSkipVerify: true" >> $OperatorContextYAML
-		echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
-		kubectl apply -f $OperatorContextYAML -n $NAMESPACE
-		rm -f $OperatorContextYAML
-	fi
+  typeset adminKey
+  typeset orgid
+  typeset OperatorContextYAML
+  OperatorContextYAML=$(mktemp /tmp/operatorContext.yaml.XXXX)
+  if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
+    # Dashboard (pro) install
+    typeset dashURL
+    adminkey=$(getAdminUserKey)
+    dashURL="http://$IP:$(getDashboardPort)/"
+    orgid=$(getOrgID)
+    echo "Deploying operator context into new Pro sandbox"
+    echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
+    echo "kind: OperatorContext" >> $OperatorContextYAML
+    echo "metadata:" >> $OperatorContextYAML
+    echo "  name: $OPERATOR_CONTEXT_NAME" >> $OperatorContextYAML
+    echo "spec:" >> $OperatorContextYAML
+    echo "  env:" >> $OperatorContextYAML
+    echo "    mode: pro" >> $OperatorContextYAML
+    echo "    auth: $adminkey" >> $OperatorContextYAML
+    echo "    org: $orgid" >> $OperatorContextYAML
+    echo "    url: $dashURL" >> $OperatorContextYAML
+    echo "    insecureSkipVerify: true" >> $OperatorContextYAML
+    echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
+    kubectl apply -f $OperatorContextYAML -n $NAMESPACE
+    rm -f $OperatorContextYAML
+  else
+    # stand alone (CE) deployment
+    typeset gatewaySecret
+    typeset gatewayURL
+    gatewaySecret=Secret
+    gatewayURL="http://$IP:$(getStandaloneGatewayPort)/"
+    echo "Deploying operator context into new CE sandbox"
+    echo "apiVersion: tyk.tyk.io/v1alpha1" > $OperatorContextYAML
+    echo "kind: OperatorContext" >> $OperatorContextYAML
+    echo "metadata:" >> $OperatorContextYAML
+    echo "  name: $OPERATOR_CONTEXT_NAME" >> $OperatorContextYAML
+    echo "spec:" >> $OperatorContextYAML
+    echo "  env:" >> $OperatorContextYAML
+    echo "    mode: ce" >> $OperatorContextYAML
+    echo "    auth: $gatewaySecret" >> $OperatorContextYAML
+    echo "    org: $NAMESPACE" >> $OperatorContextYAML # use the namespace as the org since it's free form with CE
+    echo "    url: $gatewayURL" >> $OperatorContextYAML
+    echo "    insecureSkipVerify: true" >> $OperatorContextYAML
+    echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
+    kubectl apply -f $OperatorContextYAML -n $NAMESPACE
+    rm -f $OperatorContextYAML
+  fi
 }
 
 # deploy APIs from YAML using operator context
 function deployCRDAPIs {
-	typeset APIsourceYaml
-	typeset tmpAPIyaml
-	tmpAPIyaml=$(mktemp /tmp/API.yaml.XXXX)
-	for APIsourceYaml in $*; do
-		if [[ -f $APIsourceYaml ]]; then
-			cp $APIsourceYaml $tmpAPIyaml
-			yq ".spec.contextRef.namespace = \"$NAMESPACE\"" -i $tmpAPIyaml
-			echo "[INFO]kubectl apply -f $tmpAPIyaml -n $NAMESPACE"
-			kubectl apply -f $tmpAPIyaml -n $NAMESPACE
-		fi
-	done
-	rm -f $tmpAPIyaml
+  typeset APIsourceYaml
+  typeset tmpAPIyaml
+  tmpAPIyaml=$(mktemp /tmp/API.yaml.XXXX)
+  for APIsourceYaml in $*; do
+    if [[ -f $APIsourceYaml ]]; then
+      cp $APIsourceYaml $tmpAPIyaml
+      yq ".spec.contextRef.namespace = \"$NAMESPACE\"" -i $tmpAPIyaml
+      echo "[INFO]kubectl apply -f $tmpAPIyaml -n $NAMESPACE"
+      kubectl apply -f $tmpAPIyaml -n $NAMESPACE
+    fi
+  done
+  rm -f $tmpAPIyaml
 }
 
 # Process commands and take actions
 if [[ $# -gt 0 ]]; then
-	if ! minikubeProfileExists ; then
-		if [[ $1 != 'init' ]]; then
-			echo "[FATAL]Minikube cluster '$CLUSTER' not initialised"
-			minikube profile list 2>/dev/null
-			exit 1
-		fi
-	fi
-	# setup global aliases and variables
-	setGlobals
-	case $1 in 
-		create)
-			shift
-			while getopts :c:de:E:himN:nopst:v: arg; do
-				case $arg in
-					c)
-						# the number of control gateways to deploy (these are also just gateways in the pro install)
-						# defaults to one
-						KSBX_CONTROL_GATEWAY_REPLICAS=$OPTARG
-						;;
-					d)
-						# Don't publish any APIs
-						PUBLISH_APIS=false
-						;;
-					E)
-						# environment variable file
-						ENV_VAR_FILE=$OPTARG
-						if [[ ! -f $ENV_VAR_FILE ]]; then
-							echo "[FATAL]Cannot read environment variable file: '$ENV_VAR_FILE'"
-							exit 1
-						fi
-						;;
-					e)
-						# the number of edge gateways to deploy (must be combined with -m to deploy MDCB)
-						# defaults to one
-						case $OPTARG in
-							[0-9]*)
-								KSBX_EDGE_GATEWAY_REPLICAS=$OPTARG
-								;;
-							*)
-								echo "[FATAL]Argument to -e must be the number of edge gateways to deploy"
-								exit 1
-								;;
-							esac
-						;;
-					i)
-						# add the istio label to the namespace so it's picked up by istio
-						ENABLE_ISTIO=true
-						EXTRA_NAMESPACE_LABELS="$ISTIO_INJECTION_LABEL $EXTRA_NAMESPACE_LABELS"
-						;;
-					h)
-						INSTALL_EDGE=true
-						ENABLE_HTTPS=true
-						;;
-					m)
-						# deploy with MDCB, edge redis and edge gateways
-						INSTALL_EDGE=true
-						;;
-					N)
-						# specify a particular namespace
-						NAMESPACE=$OPTARG
-						;;
-					n)
-						# don't read ENVFILE (~/.tyk-sandbox) and bootstrap
-						BOOTSTRAP=false
-						;;
-					o)
-						# deploy an operator context into the new namespace
-						INSTALL_OPR_CONTEXT=true
-						;;
-					p)
-						# use postgresql not mongodb
-						# defaults to mongo without this
-						KSBX_DATABASE=postgres
-						;;
-					s)
-						# create a CE deployment
-						KSBX_TYPE=standalone
-						;;
-					t)
-						# the description of the namespace or sandbox
-						KSBX_DESCRIPTION="$OPTARG"
-						;;
-					v)
-						# the base version to use to look up the versions of each of the products
-						sandboxVersion=$OPTARG
-						;;
-					:)
-						echo "[FATAL]Option -$OPTARG requires an arguement."
-						exit 1
-						;;
-					\?)
-						echo "[FATAL]Invalid option: -$OPTARG"
-						exit 1
-						;;
-				esac
-			done
-			if [[ -z $NAMESPACE ]]; then
-				NAMESPACE=ksandbox-$(nextFreeNamespace)
-			fi
-			if [[ $BOOTSTRAP == 'true' && -f $ENVFILE ]]; then
-				# load env variables
-				. $ENVFILE
-				if [[ -n $SBX_HOST_IP_ADDR ]]; then
-					KSBX_LOCAL_IP=$SBX_HOST_IP_ADDR
-				fi
-			fi
-			if [[ $INSTALL_EDGE == 'true' ]]; then
-				checkMDCBlicence
-			fi
-			if [[ -z $sandboxVersion ]]; then
-				echo "[FATAL]Must specify a sandbox version"
-				help
-				exit 1
-			fi
-			if [[ $ENABLE_HTTPS == 'true' ]] ; then
-				if [[ $ENABLE_ISTIO == 'true' ]]; then
-					echo "[FATAL]Istio is not compatible with gateway https. Use either -i or -h not both"
-					exit 1
-				fi
-				if [[ $KSBX_TYPE == 'standalone' ]]; then
-					echo "[FATAL]Cannot currently deploy the standalone gateway with https. Use -h or -s not both"
-					exit 1
-				fi
-			fi
-			if [[ $KSBX_TYPE == 'standalone' && $KSBX_DATABASE == 'postgres' ]]; then
-				echo "[WARN]Stand alone deployments don't use mongo or postgres. Ignoring -p"
-			fi
-			if [[ $KSBX_TYPE == 'standalone' && $INSTALL_EDGE == 'true' ]]; then
-				echo "[FATAL]Use -m or -s not both. Cannot install MDCB with standalone deployment."
-				exit 1
-			fi
-			if [[ $INSTALL_EDGE == 'true' ]]; then
-				KSBX_TYPE=mdcb
-			fi
-			if ! namespaceExists $NAMESPACE; then
-				KSBX_NS=$NAMESPACE
-				export KSBX_NS
-				if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
-					if [[ $KSBX_DATABASE == 'postgres' ]]; then
-						if ! echo $sandboxVersion | awk -F. '$1>3{exit 0} $1<4{exit 1}'; then
-							echo "[FATAL]Version must be 4 or later to use postgres"
-							exit 1
-						fi
-					fi
-					# export namespace for envsubst to pick up
-					if egrep -q "^$sandboxVersion," $VERSIONFILE; then
-						loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1)
-						echo -n "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
-						if [[ -n $KSBX_MDCB_VERS ]]; then
-							echo ", MDCB $KSBX_MDCB_VERS"
-						else
-							echo 
-						fi
-					else
-						echo "[FATAL]Unable to find '$sandboxVersion' in '$VERSIONFILE'"
-						exit 1
-					fi
-					createNamespace
-					if [[ -n $ENV_VAR_FILE ]]; then
-						# create a config map to hold the environment variables
-						kubectl create configmap sandbox-env-vars --from-env-file=$ENV_VAR_FILE -n $NAMESPACE
-					fi
-					if [[ $KSBX_DATABASE == 'mongo' ]]; then
-						echo "[INFO]Starting redis and mongo in the control plane"
-						applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
-						applyYAMLtemplate mongo-PersistentVolumeClaim.yaml mongo-deployment.yaml mongo-svc.yaml
-						# applyYAMLtemplate grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
-						waitDeploymentReady control-redis
-						waitDeploymentReady mongo-db
-					elif [[ $KSBX_DATABASE == 'postgres' ]]; then
-						echo "[INFO]Starting redis and postgres in the control plane"
-						applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
-						applyYAMLtemplate postgres-PersistentVolumeClaim.yaml postgres-deployment.yaml postgres-svc.yaml
-						# applyYAMLtemplate grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
-						waitDeploymentReady control-redis
-						waitDeploymentReady postgres-db
-					fi
-					echo "[INFO]Starting dashboard, pump and gateway"
-					# setup configmaps first
-					applyYAMLtemplate tyk-gateway-configmap-control.yaml
-					if [[ $KSBX_DATABASE == 'mongo' ]]; then
-						applyYAMLtemplate tyk-dashboard-configmap-mongo.yaml tyk-pump-configmap-mongo.yaml
-					elif [[ $KSBX_DATABASE == 'postgres' ]]; then
-						applyYAMLtemplate tyk-dashboard-configmap-postgres.yaml tyk-pump-configmap-postgres.yaml
-					fi
-					# create dashboard, control gateway and pump deployments
-					applyYAMLtemplate tyk-dashboard-deployment.yaml tyk-gateway-control-deployment.yaml tyk-pump-deployment.yaml
-					# create dashboard and control gateway services
-					applyYAMLtemplate tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
-					waitDeploymentReady tyk-dashboard
-					waitDeploymentReady control-gateway
-					licenseDashboard
-					addDashboardUser
-					if [[ $KSBX_TYPE == 'mdcb' ]]; then
-						# add edge redis and edge gateways
-						export KSBX_ADMIN_API_KEY=$(getAdminUserKey)
-						export KSBX_ORG_ID=$(getOrgID)
-						enableHybrid $KSBX_ORG_ID $KSBX_ADMIN_API_KEY
-						applyYAMLtemplate edge-redis-PersistentVolumeClaim.yaml edge-redis-deployment.yaml edge-redis-svc.yaml
-						applyYAMLtemplate tyk-gateway-configmap-edge.yaml
-						if [[ $KSBX_DATABASE == 'mongo' ]]; then
-							applyYAMLtemplate tyk-mdcb-configmap-mongo.yaml
-						elif [[ $KSBX_DATABASE == 'postgres' ]]; then
-							applyYAMLtemplate tyk-mdcb-configmap-postgres.yaml
-						fi
-						waitDeploymentReady edge-redis
-						# deploy MDCB
-						applyYAMLtemplate tyk-mdcb-deployment.yaml tyk-mdcb-svc.yaml
-						waitDeploymentReady tyk-sink
-						# deploy edge gateway(s)
-						applyYAMLtemplate tyk-gateway-edge-deployment.yaml
-						if [[ $ENABLE_HTTPS == 'true' ]]; then
-							enableEdgeHttps
-						fi
-						waitDeploymentReady edge-gateway
-						applyYAMLtemplate tyk-gateway-svc-edge.yaml
-					fi
-					if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
-							deployOperatorContext
-					fi
-					if [[ $PUBLISH_APIS == 'true' ]]; then
-						if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
-							publishAPIs $SCRIPTDIR/APIs/*.json
-						else
-							deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
-						fi
-					fi
-					listPods
-					reportSanboxInfo 
-				else
-					# create standalone (CE) deployment of the gateway
-					loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
-					createNamespace
-					if [[ -n $ENV_VAR_FILE ]]; then
-						# create a config map to hold the environment variables
-						kubectl create configmap sandbox-env-vars --from-env-file=$ENV_VAR_FILE -n $NAMESPACE
-					fi
-					applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
-					waitDeploymentReady control-redis
-					applyYAMLtemplate tyk-gateway-configmap-standalone.yaml
-					applyYAMLtemplate tyk-gateway-standalone-deployment.yaml
-					applyYAMLtemplate tyk-gateway-svc-standalone.yaml
-					waitDeploymentReady standalone-gateway
-					if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
-							deployOperatorContext
-					fi
-					if [[ $PUBLISH_APIS == 'true' ]]; then
-						if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
-							publishAPIs $SCRIPTDIR/APIs/*.json
-						else
-							deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
-						fi
-					fi
-					listPods
-					reportSanboxInfo 
-				fi
-			else
-				echo "[FATAL]Namespace '$NAMESPACE' already exists"
-				exit 1
-			fi
-			;;
-		rm | del*)
-			typeset API
-			typeset OC
-			shift
-			if [[ $# -lt 1 ]]; then
-				echo "[FATAL]Must provide namespace"
-				exit 1
-			fi
-			for NAMESPACE in $(getNamespaceNames $*); do
-				if namespaceExists $NAMESPACE; then
-					echo "[INFO]Deleting Namespace $NAMESPACE"
-					MaskOperatorContext $NAMESPACE
-					RemoveTykCRDs $NAMESPACE
-					if OperatorContextExists $NAMESPACE ]]; then
-						echo "[INFO]Deleting OperatorContext from $NAMESPACE"
-						echo "[INFO]kubectl delete OperatorContext --all -n $NAMESPACE"
-						kubectl delete OperatorContext --all -n $NAMESPACE
-						echo "[INFO]kubectl delete namespace $NAMESPACE --wait"
-					fi
-					kubectl delete namespace $NAMESPACE --wait
-				fi
-			done
-			tidyPVCs
-			;;
-		help)
-			help
-			;;
-		info)
-			shift
-			if [[ $# -lt 1 ]]; then
-				# give info on all if none given
-				typeset allSandboxes
-				allSandboxes=$(getAllSandboxes)
-				if [[ $allSandboxes = "" ]]; then
-					echo "[INFO]No sandboxes configured"
-					exit 0
-				fi
-				set $allSandboxes
-			fi
-			for NAMESPACE in $(getNamespaceNames $*); do
-				if namespaceExists $NAMESPACE; then
-					# set KSBX_DATABASE for this namespace
-					getDatabaseType
-					# find if it's a pro or standalone install
-					getInstallType
-					echo "[INFO]$NAMESPACE"
-					showTykVersions
-					listPods
-					reportSanboxInfo
-					echo
-				else
-					echo "[WARN]Namespace '$NAMESPACE' not found"
-				fi
-			done
-			;;
-		init)
-			setupMinikube
-			setupMinikubeStorage
-			;;
-		list)
-			echo "[INFO]kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL"
-			kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL
-			;;
+  if ! minikubeProfileExists ; then
+    if [[ $1 != 'init' ]]; then
+      echo "[FATAL]Minikube cluster '$CLUSTER' not initialised"
+      minikube profile list 2>/dev/null
+      exit 1
+    fi
+  fi
+  # setup global aliases and variables
+  setGlobals
+  case $1 in 
+    create)
+      shift
+      while getopts :c:de:E:himN:nopst:v: arg; do
+        case $arg in
+          c)
+            # the number of control gateways to deploy (these are also just gateways in the pro install)
+            # defaults to one
+            KSBX_CONTROL_GATEWAY_REPLICAS=$OPTARG
+            ;;
+          d)
+            # Don't publish any APIs
+            PUBLISH_APIS=false
+            ;;
+          E)
+            # environment variable file
+            ENV_VAR_FILE=$OPTARG
+            if [[ ! -f $ENV_VAR_FILE ]]; then
+              echo "[FATAL]Cannot read environment variable file: '$ENV_VAR_FILE'"
+              exit 1
+            fi
+            ;;
+          e)
+            # the number of edge gateways to deploy (must be combined with -m to deploy MDCB)
+            # defaults to one
+            case $OPTARG in
+              [0-9]*)
+                KSBX_EDGE_GATEWAY_REPLICAS=$OPTARG
+                ;;
+              *)
+                echo "[FATAL]Argument to -e must be the number of edge gateways to deploy"
+                exit 1
+                ;;
+            esac
+            ;;
+          i)
+            # add the istio label to the namespace so it's picked up by istio
+            ENABLE_ISTIO=true
+            EXTRA_NAMESPACE_LABELS="$ISTIO_INJECTION_LABEL $EXTRA_NAMESPACE_LABELS"
+            ;;
+          h)
+            INSTALL_EDGE=true
+            ENABLE_HTTPS=true
+            ;;
+          m)
+            # deploy with MDCB, edge redis and edge gateways
+            INSTALL_EDGE=true
+            ;;
+          N)
+            # specify a particular namespace
+            NAMESPACE=$OPTARG
+            ;;
+          n)
+            # don't read ENVFILE (~/.tyk-sandbox) and bootstrap
+            BOOTSTRAP=false
+            ;;
+          o)
+            # deploy an operator context into the new namespace
+            INSTALL_OPR_CONTEXT=true
+            ;;
+          p)
+            # use postgresql not mongodb
+            # defaults to mongo without this
+            KSBX_DATABASE=postgres
+            ;;
+          s)
+            # create a CE deployment
+            KSBX_TYPE=standalone
+            ;;
+          t)
+            # the description of the namespace or sandbox
+            KSBX_DESCRIPTION="$OPTARG"
+            ;;
+          v)
+            # the base version to use to look up the versions of each of the products
+            sandboxVersion=$OPTARG
+            ;;
+          :)
+            echo "[FATAL]Option -$OPTARG requires an arguement."
+            exit 1
+            ;;
+          \?)
+            echo "[FATAL]Invalid option: -$OPTARG"
+            exit 1
+            ;;
+        esac
+      done
+      if [[ -z $NAMESPACE ]]; then
+        NAMESPACE=ksandbox-$(nextFreeNamespace)
+      fi
+      if [[ $BOOTSTRAP == 'true' && -f $ENVFILE ]]; then
+        # load env variables
+        . $ENVFILE
+        if [[ -n $SBX_HOST_IP_ADDR ]]; then
+          KSBX_LOCAL_IP=$SBX_HOST_IP_ADDR
+        fi
+      fi
+      if [[ $INSTALL_EDGE == 'true' ]]; then
+        checkMDCBlicence
+      fi
+      if [[ -z $sandboxVersion ]]; then
+        echo "[FATAL]Must specify a sandbox version"
+        help
+        exit 1
+      fi
+      if [[ $ENABLE_HTTPS == 'true' ]] ; then
+        if [[ $ENABLE_ISTIO == 'true' ]]; then
+          echo "[FATAL]Istio is not compatible with gateway https. Use either -i or -h not both"
+          exit 1
+        fi
+        if [[ $KSBX_TYPE == 'standalone' ]]; then
+          echo "[FATAL]Cannot currently deploy the standalone gateway with https. Use -h or -s not both"
+          exit 1
+        fi
+      fi
+      if [[ $KSBX_TYPE == 'standalone' && $KSBX_DATABASE == 'postgres' ]]; then
+        echo "[WARN]Stand alone deployments don't use mongo or postgres. Ignoring -p"
+      fi
+      if [[ $KSBX_TYPE == 'standalone' && $INSTALL_EDGE == 'true' ]]; then
+        echo "[FATAL]Use -m or -s not both. Cannot install MDCB with standalone deployment."
+        exit 1
+      fi
+      if [[ $INSTALL_EDGE == 'true' ]]; then
+        KSBX_TYPE=mdcb
+      fi
+      if ! namespaceExists $NAMESPACE; then
+        KSBX_NS=$NAMESPACE
+        export KSBX_NS
+        if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
+          if [[ $KSBX_DATABASE == 'postgres' ]]; then
+            if ! echo $sandboxVersion | awk -F. '$1>3{exit 0} $1<4{exit 1}'; then
+              echo "[FATAL]Version must be 4 or later to use postgres"
+              exit 1
+            fi
+          fi
+          # export namespace for envsubst to pick up
+          if egrep -q "^$sandboxVersion," $VERSIONFILE; then
+            loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1)
+            echo -n "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
+            if [[ -n $KSBX_MDCB_VERS ]]; then
+              echo ", MDCB $KSBX_MDCB_VERS"
+            else
+              echo 
+            fi
+          else
+            echo "[FATAL]Unable to find '$sandboxVersion' in '$VERSIONFILE'"
+            exit 1
+          fi
+          createNamespace
+          if [[ -n $ENV_VAR_FILE ]]; then
+            # create a config map to hold the environment variables
+            kubectl create configmap sandbox-env-vars --from-env-file=$ENV_VAR_FILE -n $NAMESPACE
+          fi
+          if [[ $KSBX_DATABASE == 'mongo' ]]; then
+            echo "[INFO]Starting redis and mongo in the control plane"
+            applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
+            applyYAMLtemplate mongo-PersistentVolumeClaim.yaml mongo-deployment.yaml mongo-svc.yaml
+            # applyYAMLtemplate grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
+            waitDeploymentReady control-redis
+            waitDeploymentReady mongo-db
+          elif [[ $KSBX_DATABASE == 'postgres' ]]; then
+            echo "[INFO]Starting redis and postgres in the control plane"
+            applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
+            applyYAMLtemplate postgres-PersistentVolumeClaim.yaml postgres-deployment.yaml postgres-svc.yaml
+            # applyYAMLtemplate grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
+            waitDeploymentReady control-redis
+            waitDeploymentReady postgres-db
+          fi
+          echo "[INFO]Starting dashboard, pump and gateway"
+          # setup configmaps first
+          applyYAMLtemplate tyk-gateway-configmap-control.yaml
+          if [[ $KSBX_DATABASE == 'mongo' ]]; then
+            applyYAMLtemplate tyk-dashboard-configmap-mongo.yaml tyk-pump-configmap-mongo.yaml
+          elif [[ $KSBX_DATABASE == 'postgres' ]]; then
+            applyYAMLtemplate tyk-dashboard-configmap-postgres.yaml tyk-pump-configmap-postgres.yaml
+          fi
+          # create dashboard, control gateway and pump deployments
+          applyYAMLtemplate tyk-dashboard-deployment.yaml tyk-gateway-control-deployment.yaml tyk-pump-deployment.yaml
+          # create dashboard and control gateway services
+          applyYAMLtemplate tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
+          waitDeploymentReady tyk-dashboard
+          waitDeploymentReady control-gateway
+          licenseDashboard
+          addDashboardUser
+          if [[ $KSBX_TYPE == 'mdcb' ]]; then
+            # add edge redis and edge gateways
+            export KSBX_ADMIN_API_KEY=$(getAdminUserKey)
+            export KSBX_ORG_ID=$(getOrgID)
+            enableHybrid $KSBX_ORG_ID $KSBX_ADMIN_API_KEY
+            applyYAMLtemplate edge-redis-PersistentVolumeClaim.yaml edge-redis-deployment.yaml edge-redis-svc.yaml
+            applyYAMLtemplate tyk-gateway-configmap-edge.yaml
+            if [[ $KSBX_DATABASE == 'mongo' ]]; then
+              applyYAMLtemplate tyk-mdcb-configmap-mongo.yaml
+            elif [[ $KSBX_DATABASE == 'postgres' ]]; then
+              applyYAMLtemplate tyk-mdcb-configmap-postgres.yaml
+            fi
+            waitDeploymentReady edge-redis
+            # deploy MDCB
+            applyYAMLtemplate tyk-mdcb-deployment.yaml tyk-mdcb-svc.yaml
+            waitDeploymentReady tyk-sink
+            # deploy edge gateway(s)
+            applyYAMLtemplate tyk-gateway-edge-deployment.yaml
+            if [[ $ENABLE_HTTPS == 'true' ]]; then
+              enableEdgeHttps
+            fi
+            waitDeploymentReady edge-gateway
+            applyYAMLtemplate tyk-gateway-svc-edge.yaml
+          fi
+          if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
+            deployOperatorContext
+          fi
+          if [[ $PUBLISH_APIS == 'true' ]]; then
+            if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
+              publishAPIs $SCRIPTDIR/APIs/*.json
+            else
+              deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
+            fi
+          fi
+          listPods
+          reportSanboxInfo 
+        else
+          # create standalone (CE) deployment of the gateway
+          loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
+          createNamespace
+          if [[ -n $ENV_VAR_FILE ]]; then
+            # create a config map to hold the environment variables
+            kubectl create configmap sandbox-env-vars --from-env-file=$ENV_VAR_FILE -n $NAMESPACE
+          fi
+          applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
+          waitDeploymentReady control-redis
+          applyYAMLtemplate tyk-gateway-configmap-standalone.yaml
+          applyYAMLtemplate tyk-gateway-standalone-deployment.yaml
+          applyYAMLtemplate tyk-gateway-svc-standalone.yaml
+          waitDeploymentReady standalone-gateway
+          if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
+            deployOperatorContext
+          fi
+          if [[ $PUBLISH_APIS == 'true' ]]; then
+            if [[ $INSTALL_OPR_CONTEXT == 'false' ]]; then
+              publishAPIs $SCRIPTDIR/APIs/*.json
+            else
+              deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
+            fi
+          fi
+          listPods
+          reportSanboxInfo 
+        fi
+      else
+        echo "[FATAL]Namespace '$NAMESPACE' already exists"
+        exit 1
+      fi
+      ;;
 
-		get)
-			shift
-			NAMESPACE=$(getNamespaceNames $1)
-			shift
-			case $1 in
-				[Dd]esc*)
-					getDescription
-					;;
-				dash*)
-					echo http://$IP:$(getDashboardPort)/
-					;;
-				control-g*|gate*)
-					echo http://$IP:$(getControlGatewayPort)/
-					;;
-				MDCB*)
-					echo $IP:$(getMDCBPort)
-					;;
-				edge-g*)
-					typeset https
-					https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
-					if [[ $https == 'true' ]]; then
-						echo https://$IP:$(getEdgeGatewayPort)/
-					else
-						echo http://$IP:$(getEdgeGatewayPort)/
-					fi
-					;;
-				mong*)
-					echo mongodb://$IP:$(getMongoPort)/tyk_analytics
-					;;
-				control-r*|redis)
-					echo $IP:$(getControlRedisPort)
-					;;
-				edge-r*)
-					echo $IP:$(getEdgeRedisPort)
-					;;
-				*[kK]ey)
-					echo $(getAdminUserKey)
-					;;
-				[Oo]rg*)
-					echo $(getOrgID)
-					;;
-				*)
-					echo "[FATAL]Unknown option $1"
-					exit 1
-					;;
-			esac
-			;;
+    rm | del*)
+      typeset API
+      typeset OC
+      shift
+      if [[ $# -lt 1 ]]; then
+        echo "[FATAL]Must provide namespace"
+        exit 1
+      fi
+      for NAMESPACE in $(getNamespaceNames $*); do
+        if namespaceExists $NAMESPACE; then
+          echo "[INFO]Deleting Namespace $NAMESPACE"
+          MaskOperatorContext $NAMESPACE
+          RemoveTykCRDs $NAMESPACE
+          if OperatorContextExists $NAMESPACE ]]; then
+            echo "[INFO]Deleting OperatorContext from $NAMESPACE"
+            echo "[INFO]kubectl delete OperatorContext --all -n $NAMESPACE"
+            kubectl delete OperatorContext --all -n $NAMESPACE
+            echo "[INFO]kubectl delete namespace $NAMESPACE --wait"
+          fi
+          kubectl delete namespace $NAMESPACE --wait
+        fi
+      done
+      tidyPVCs
+      ;;
 
-		log*)
-			shift
-			if [[ $# -lt 2 ]]; then
-				echo "[FATAL]Must provide namespace and pod names"
-				exit 1
-			fi
-			NAMESPACE=$(getNamespaceNames $1)
-			shift
-			showLogs $1
-			;;
-		modify)
-			# modify the number of pods or the version deployed
-			shift
-			if [[ $# -lt 4 ]]; then
-				echo "[FATAL]Not enough arguments to 'modify'"
-				help
-				exit 1
-			fi
-			NAMESPACE=$(getNamespaceNames $1)
-			shift
-			typeset deploymentName
-			if ! deploymentExists $1; then
-				exit 1
-			fi
-			deploymentName=$(getDeploymentName $1)
-			shift
-			typeset newPodCount; typeset newPodVersion
-			newPodCount=''; newPodVersion=''
-			if namespaceExists $NAMESPACE; then
-				while getopts :c:v: arg; do
-					case $arg in
-						c)
-							# change the number of pods deployed
-							newPodCount=$OPTARG
-							;;
-						v)
-							# change the number of pods deployed
-							newPodVersion=$OPTARG
-							# if it doesn't start with a 'v' add a 'v'
-							if [[ ${newPodVersion:0:1} != 'v' ]]; then
-								newPodVersion="v$newPodVersion"
-							fi
-							;;
-						:)
-							echo "[FATAL]Option -$OPTARG requires an arguement."
-							exit 1
-							;;
-						\?)
-							echo "[FATAL]Invalid option: -$OPTARG"
-							exit 1
-							;;
-					esac
-				done
-				if [[ -n $newPodCount || -n $newPodVersion ]]; then
-					# grab the deployment and update it
-					typeset tmpDeploymentYaml
-					tmpDeploymentYaml=$(mktemp /tmp/deployment.XXXX.yaml)
-					echo "[INFO]kubectl get deploy -n $NAMESPACE $deploymentName -o yaml > $tmpDeploymentYaml"
-					kubectl get deploy -n $NAMESPACE $deploymentName -o yaml > $tmpDeploymentYaml
-					if [[ -n $newPodCount ]]; then
-						yq ".spec.replicas = $newPodCount" -i $tmpDeploymentYaml
-					fi
-					if [[ -n $newPodVersion ]]; then
-						typeset currentVersion
-						currentVersion=$(yq '.spec.template.spec.containers.[0].image' $tmpDeploymentYaml | cut -d: -f2)
-						sed -i "s/$currentVersion/$newPodVersion/" $tmpDeploymentYaml
-					fi
-					echo "[INFO]kubectl apply -f $tmpDeploymentYaml -n $NAMESPACE"
-					kubectl apply -f $tmpDeploymentYaml -n $NAMESPACE
-					echo "[INFO]kubectl rollout status deployment $deploymentName -n $NAMESPACE"
-					kubectl rollout status deployment $deploymentName -n $NAMESPACE
-					rm -f $tmpDeploymentYaml
-				fi
-			else
-				echo "[FATAL]No such ksandbox: $NAMESPACE"
-				exit 1
-			fi
-			;;
-		monitor)
-			shift
-			typeset monitorPodName
-			NAMESPACE=$(getNamespaceNames $1)
-			if [[ $# -lt 2 ]]; then
-				echo "[FATAL]Must provide namespace and podname"
-				exit 1
-			fi
-			monitorPodName=$(kubectl get pods -n $NAMESPACE | awk '/'$2'/ {print $1}' | head -1)
-			echo "[INFO]Monitoring $monitorPodName CPU and Memory every $POD_MONITOR_FREQ s"
-			echo "[INFO]kubectl top pod $monitorPodName -n $NAMESPACE --containers --no-headers=true"
-			while true; do
-				date +%F_%T
-				kubectl top pod $monitorPodName -n $NAMESPACE --containers --no-headers=true
-				sleep $POD_MONITOR_FREQ
-			done
-			;;
-		operatorlogs)
-			typeset operatorPodName
-			operatorPodName=$(kubectl get pods -n tyk-operator-system --no-headers=true | awk '{print $1}')
-			if [[ -n $operatorPodName ]]; then
-				echo "[INFO]kubectl logs $operatorPodName -n tyk-operator-system -f"
-				kubectl logs $operatorPodName -n tyk-operator-system -f
-			else
-				echo "[FATAL]No operator pod found"
-				exit 1
-			fi
-			;;
-		pods)
-			shift
-			if [[ $# -lt 1 ]]; then
-				# give info on all if none given
-				typeset allSandboxes
-				allSandboxes=$(getAllSandboxes)
-				if [[ $allSandboxes = "" ]]; then
-					echo "[INFO]No sandboxes configured"
-					exit 0
-				fi
-				set $allSandboxes
-			fi
-			for NAMESPACE in $(getNamespaceNames $*); do
-				if namespaceExists $NAMESPACE; then
-					echo "[INFO]$NAMESPACE"
-					listPods
-					echo
-				else
-					echo "[FATAL]No such ksandbox: $NAMESPACE"
-				fi
-			done
-			;;
-		publish)
-			shift
-			if [[ $# -lt 1 ]]; then
-				echo "[FATAL]Must provide namespace"
-				exit 1
-			fi
-			NAMESPACE=$(getNamespaceNames $1)
-			shift
-			if namespaceExists $NAMESPACE; then
-				publishAPIs "$@"
-			else
-				echo "[FATAL]No such ksandbox: $NAMESPACE"
-			fi
-			;;
-		setup)
-			shift
-			if [[ $# -lt 1 ]]; then
-				echo "Must provide option: 'operator' or 'istio'"
-				exit 1
-			fi
-			case $1 in
-				operator)
-					setupHelmAndOperator
-					;;
-				istio)
-					setupIstio
-					;;
-				*)
-					echo "Unsupported option: '$1'. Use 'operator' or 'istio'"
-					;;
-			esac
-			;;
-		shell)
-			shift
-			if [[ $# -lt 1 ]]; then
-				echo "[FATAL]Must provide namespace"
-				exit 1
-			fi
-			NAMESPACE=$(getNamespaceNames $1)
-			shift
-			if namespaceExists $NAMESPACE; then
-				runShell $*
-			else
-				echo "[FATAL]No such ksandbox: $NAMESPACE"
-			fi
-			;;
-		start)
-			startMinikube
-			;;
-		version*)
-			shift
-			if [[ $# -lt 1 ]]; then
-				# give info on all if none given
-				typeset allSandboxes
-				allSandboxes=$(getAllSandboxes)
-				if [[ $allSandboxes = "" ]]; then
-					echo "[INFO]No sandboxes configured"
-					exit 0
-				fi
-				set $allSandboxes
-			fi
-			for NAMESPACE in $(getNamespaceNames $*); do
-				echo "[INFO]$NAMESPACE deployed versions"
-				for deployment in $(kubectl get deploy --no-headers=true -n $NAMESPACE | awk '{print $1}'); do
-					echo "   $deployment: $(kubectl get deploy $deployment -n $NAMESPACE -o yaml | yq ".spec.template.spec.containers.[].image" | xargs)"
-				done | sort
-				echo
-			done
-			;;
-		*)
-			echo "[FATAL]$1 not implemented"
-			help
-			exit 1
-			;;
-	esac
+    help)
+      help
+      ;;
+
+    info)
+      shift
+      if [[ $# -lt 1 ]]; then
+        # give info on all if none given
+        typeset allSandboxes
+        allSandboxes=$(getAllSandboxes)
+        if [[ $allSandboxes = "" ]]; then
+          echo "[INFO]No sandboxes configured"
+          exit 0
+        fi
+        set $allSandboxes
+      fi
+      for NAMESPACE in $(getNamespaceNames $*); do
+        if namespaceExists $NAMESPACE; then
+          # set KSBX_DATABASE for this namespace
+          getDatabaseType
+          # find if it's a pro or standalone install
+          getInstallType
+          echo "[INFO]$NAMESPACE"
+          showTykVersions
+          listPods
+          reportSanboxInfo
+          echo
+        else
+          echo "[WARN]Namespace '$NAMESPACE' not found"
+        fi
+      done
+      ;;
+    init)
+      setupMinikube
+      setupMinikubeStorage
+      ;;
+
+    list)
+      echo "[INFO]kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL"
+      kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL
+      ;;
+
+    get)
+      shift
+      NAMESPACE=$(getNamespaceNames $1)
+      getInstallType
+      getDatabaseType
+      shift
+      case $1 in
+        [Dd]esc*)
+          getDescription
+          ;;
+        dash*)
+          if [[ $KSBX_TYPE == 'mdcb' || $KSBX_TYPE == 'pro' ]]; then
+            echo http://$IP:$(getDashboardPort)/
+          else
+            echo "[FATAL]Install is of type $KSBX_TYPE: No Dashboard" 1>&2
+            exit 1
+          fi
+          ;;
+        control-g*|gate*)
+          if [[ $KSBX_TYPE == 'mdcb' || $KSBX_TYPE == 'pro' ]]; then
+            echo http://$IP:$(getControlGatewayPort)/
+          elif [[ $KSBX_TYPE == 'standalone' ]]; then
+            echo http://$IP:$(getStandaloneGatewayPort)/
+          fi
+          ;;
+        control-r*|redis)
+          echo "-h $IP -p $(getControlRedisPort)"
+          ;;
+        edge-g*)
+          if [[ $KSBX_TYPE == 'mdcb' ]]; then
+            typeset https
+            https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
+            if [[ $https == 'true' ]]; then
+              echo https://$IP:$(getEdgeGatewayPort)/
+            else
+              echo http://$IP:$(getEdgeGatewayPort)/
+            fi
+          else
+            echo "[FATAL]Install is of type $KSBX_TYPE: No edge" 1>&2
+            exit 1
+          fi
+          ;;
+        edge-r*)
+          if [[ $KSBX_TYPE == 'mdcb' ]]; then
+            echo "-h $IP -p $(getEdgeRedisPort)"
+          else
+            echo "[FATAL]Install is of type $KSBX_TYPE: No edge" 1>&2
+            exit 1
+          fi
+          ;;
+        *[kK]ey|[Aa]dmin*)
+          echo $(getAdminUserKey)
+          ;;
+        MDCB*|mdcb*|sink*)
+          if [[ $KSBX_TYPE == 'mdcb' ]]; then
+            echo $IP:$(getMDCBPort)
+          else
+            echo "[FATAL]Install is of type $KSBX_TYPE: No MDCB" 1>&2
+            exit 1
+          fi
+          ;;
+        mong*)
+          if [[ $KSBX_DATABASE == 'mongo' ]]; then
+            if [[ $KSBX_TYPE == 'mdcb' || $KSBX_TYPE == 'pro' ]]; then
+              echo mongodb://$IP:$(getMongoPort)/tyk_analytics
+            else
+              echo "[FATAL]Install is of type $KSBX_TYPE: No database" 1>&2
+              exit 1
+            fi
+          else
+            echo "[FATAL]Database is of type $KSBX_DATABASE: No mongo" 1>&2
+            exit 1
+          fi
+          ;;
+        [Oo]rg*)
+          if [[ $KSBX_TYPE != 'standalone' ]]; then
+            echo $(getOrgID)
+          else
+            echo "[FATAL]Install is of type $KSBX_TYPE: No Organisation" 1>&2
+            exit 1
+          fi
+          ;;
+        post*)
+          if [[ $KSBX_DATABASE == 'postgres' ]]; then
+            echo "PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$(getPostgresPort)"
+          else
+            if [[ $KSBX_TYPE == 'mdcb' || $KSBX_TYPE == 'pro' ]]; then
+              echo "[FATAL]Database is of type $KSBX_DATABASE: No postgres" 1>&2
+              exit 1
+            else
+              echo "[FATAL]Install is of type $KSBX_TYPE: No database" 1>&2
+              exit 1
+            fi
+          fi
+          ;;
+        *)
+          echo "[FATAL]Unknown option $1"
+          exit 1
+          ;;
+      esac
+      ;;
+
+    log*)
+      shift
+      if [[ $# -lt 2 ]]; then
+        echo "[FATAL]Must provide namespace and pod names"
+        exit 1
+      fi
+      NAMESPACE=$(getNamespaceNames $1)
+      shift
+      showLogs $1
+      ;;
+
+    modify)
+      # modify the number of pods or the version deployed
+      shift
+      if [[ $# -lt 4 ]]; then
+        echo "[FATAL]Not enough arguments to 'modify'"
+        help
+        exit 1
+      fi
+      NAMESPACE=$(getNamespaceNames $1)
+      shift
+      typeset deploymentName
+      if ! deploymentExists $1; then
+        exit 1
+      fi
+      deploymentName=$(getDeploymentName $1)
+      shift
+      typeset newPodCount; typeset newPodVersion
+      newPodCount=''; newPodVersion=''
+      if namespaceExists $NAMESPACE; then
+        while getopts :c:v: arg; do
+          case $arg in
+            c)
+              # change the number of pods deployed
+              newPodCount=$OPTARG
+              ;;
+            v)
+              # change the number of pods deployed
+              newPodVersion=$OPTARG
+              # if it doesn't start with a 'v' add a 'v'
+              if [[ ${newPodVersion:0:1} != 'v' ]]; then
+                newPodVersion="v$newPodVersion"
+              fi
+              ;;
+            :)
+              echo "[FATAL]Option -$OPTARG requires an arguement."
+              exit 1
+              ;;
+            \?)
+              echo "[FATAL]Invalid option: -$OPTARG"
+              exit 1
+              ;;
+          esac
+        done
+        if [[ -n $newPodCount || -n $newPodVersion ]]; then
+          # grab the deployment and update it
+          typeset tmpDeploymentYaml
+          tmpDeploymentYaml=$(mktemp /tmp/deployment.XXXX.yaml)
+          echo "[INFO]kubectl get deploy -n $NAMESPACE $deploymentName -o yaml > $tmpDeploymentYaml"
+          kubectl get deploy -n $NAMESPACE $deploymentName -o yaml > $tmpDeploymentYaml
+          if [[ -n $newPodCount ]]; then
+            yq ".spec.replicas = $newPodCount" -i $tmpDeploymentYaml
+          fi
+          if [[ -n $newPodVersion ]]; then
+            typeset currentVersion
+            currentVersion=$(yq '.spec.template.spec.containers.[0].image' $tmpDeploymentYaml | cut -d: -f2)
+            sed -i "s/$currentVersion/$newPodVersion/" $tmpDeploymentYaml
+          fi
+          echo "[INFO]kubectl apply -f $tmpDeploymentYaml -n $NAMESPACE"
+          kubectl apply -f $tmpDeploymentYaml -n $NAMESPACE
+          echo "[INFO]kubectl rollout status deployment $deploymentName -n $NAMESPACE"
+          kubectl rollout status deployment $deploymentName -n $NAMESPACE
+          rm -f $tmpDeploymentYaml
+        fi
+      else
+        echo "[FATAL]No such ksandbox: $NAMESPACE"
+        exit 1
+      fi
+      ;;
+
+    monitor)
+      shift
+      typeset monitorPodName
+      NAMESPACE=$(getNamespaceNames $1)
+      if [[ $# -lt 2 ]]; then
+        echo "[FATAL]Must provide namespace and podname"
+        exit 1
+      fi
+      monitorPodName=$(kubectl get pods -n $NAMESPACE | awk '/'$2'/ {print $1}' | head -1)
+      echo "[INFO]Monitoring $monitorPodName CPU and Memory every $POD_MONITOR_FREQ s"
+      echo "[INFO]kubectl top pod $monitorPodName -n $NAMESPACE --containers --no-headers=true"
+      while true; do
+        date +%F_%T
+        kubectl top pod $monitorPodName -n $NAMESPACE --containers --no-headers=true
+        sleep $POD_MONITOR_FREQ
+      done
+      ;;
+
+    operatorlogs)
+      typeset operatorPodName
+      operatorPodName=$(kubectl get pods -n tyk-operator-system --no-headers=true | awk '{print $1}')
+      if [[ -n $operatorPodName ]]; then
+        echo "[INFO]kubectl logs $operatorPodName -n tyk-operator-system -f"
+        kubectl logs $operatorPodName -n tyk-operator-system -f
+      else
+        echo "[FATAL]No operator pod found"
+        exit 1
+      fi
+      ;;
+
+    pods)
+      shift
+      if [[ $# -lt 1 ]]; then
+        # give info on all if none given
+        typeset allSandboxes
+        allSandboxes=$(getAllSandboxes)
+        if [[ $allSandboxes = "" ]]; then
+          echo "[INFO]No sandboxes configured"
+          exit 0
+        fi
+        set $allSandboxes
+      fi
+      for NAMESPACE in $(getNamespaceNames $*); do
+        if namespaceExists $NAMESPACE; then
+          echo "[INFO]$NAMESPACE"
+          listPods
+          echo
+        else
+          echo "[FATAL]No such ksandbox: $NAMESPACE"
+        fi
+      done
+      ;;
+
+    publish)
+      shift
+      if [[ $# -lt 1 ]]; then
+        echo "[FATAL]Must provide namespace"
+        exit 1
+      fi
+      NAMESPACE=$(getNamespaceNames $1)
+      shift
+      if namespaceExists $NAMESPACE; then
+        publishAPIs "$@"
+      else
+        echo "[FATAL]No such ksandbox: $NAMESPACE"
+      fi
+      ;;
+
+    setup)
+      shift
+      if [[ $# -lt 1 ]]; then
+        echo "Must provide option: 'operator' or 'istio'"
+        exit 1
+      fi
+      case $1 in
+        operator)
+          setupHelmAndOperator
+          ;;
+        istio)
+          setupIstio
+          ;;
+        *)
+          echo "Unsupported option: '$1'. Use 'operator' or 'istio'"
+          ;;
+      esac
+      ;;
+
+    shell)
+      shift
+      if [[ $# -lt 1 ]]; then
+        echo "[FATAL]Must provide namespace"
+        exit 1
+      fi
+      NAMESPACE=$(getNamespaceNames $1)
+      shift
+      if namespaceExists $NAMESPACE; then
+        runShell $*
+      else
+        echo "[FATAL]No such ksandbox: $NAMESPACE"
+      fi
+      ;;
+
+    start)
+      startMinikube
+      ;;
+
+    version*)
+      shift
+      if [[ $# -lt 1 ]]; then
+        # give info on all if none given
+        typeset allSandboxes
+        allSandboxes=$(getAllSandboxes)
+        if [[ $allSandboxes = "" ]]; then
+          echo "[INFO]No sandboxes configured"
+          exit 0
+        fi
+        set $allSandboxes
+      fi
+      for NAMESPACE in $(getNamespaceNames $*); do
+        echo "[INFO]$NAMESPACE deployed versions"
+        for deployment in $(kubectl get deploy --no-headers=true -n $NAMESPACE | awk '{print $1}'); do
+          echo "   $deployment: $(kubectl get deploy $deployment -n $NAMESPACE -o yaml | yq ".spec.template.spec.containers.[].image" | xargs)"
+        done | sort
+        echo
+      done
+      ;;
+
+    *)
+      echo "[FATAL]$1 not implemented"
+      help
+      exit 1
+      ;;
+  esac
 else
-	help
+  help
 fi
