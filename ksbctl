@@ -584,7 +584,7 @@ function CrdExists {
   namespace=$1
   CRD=$2
   CrdCount=0
-  if kubectl get crd -n $namespace --no-headers=true | grep -q "$CRD"; then
+  if kubectl get crd -n $namespace --no-headers=true 2>&- | grep -q "$CRD"; then
     if [[ $(kubectl get $CRD -n $namespace --no-headers=true 2>&- | wc -l) -gt 0 ]]
     then
       return 0
@@ -994,6 +994,7 @@ if [[ $# -gt 0 ]]; then
   # setup global aliases and variables
   setGlobals
   case $1 in 
+
     create)
       shift
       while getopts :c:de:E:himN:nopst:v: arg; do
