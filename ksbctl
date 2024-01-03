@@ -1052,7 +1052,12 @@ if [[ $# -gt 0 ]]; then
             ;;
           o)
             # deploy an operator context into the new namespace
-            INSTALL_OPR_CONTEXT=true
+						if namespaceExists tyk-operator-system; then
+							INSTALL_OPR_CONTEXT=true
+						else
+							echo "[FATAL]Tyk operator is not installed. Install with '$SCRIPTNAME setup operator'"
+							exit 1
+						fi
             ;;
           p)
             # use postgresql not mongodb
