@@ -886,6 +886,8 @@ function publishAPIs {
           \rm $APIfileName
         fi
       done
+    else
+      echo "[WARN]Cannot get Adminkey so cannot publishAPIs"
     fi
   else
     # stand alone (ce)
