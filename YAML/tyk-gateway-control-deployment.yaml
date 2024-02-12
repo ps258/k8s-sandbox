@@ -42,6 +42,8 @@ spec:
         volumeMounts:
           - name: tyk-gateway-conf
             mountPath: /etc/tyk-gateway
+          - name: plugins
+            mountPath: /opt/tyk-plugins
         livenessProbe:
           httpGet:
             scheme: "HTTP"
@@ -61,6 +63,9 @@ spec:
           timeoutSeconds: 3
           failureThreshold: 3
       volumes:
+        - name: plugins
+          hostPath:
+            path: /plugins
         - name: tyk-gateway-conf
           configMap:
             name: tyk-gateway-conf-control

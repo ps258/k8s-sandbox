@@ -297,13 +297,20 @@ function startMinikube {
   fi
 }
 
-
 # start minikube if it's not already running
 function setupMinikube {
+  typeset mount_command
+  mount_command=""
   if which minikube > /dev/null 2>&1 ; then
     if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
+      if [[ ! -d $HOME/.tyk/plugins ]]; then
+        mkdir -p $HOME/.tyk/plugins
+      fi
+      if [[ -d $HOME/.tyk/plugins ]]; then
+        mount_command="--mount-string=$HOME/.tyk/plugins:/plugins --mount"
+      fi
       echo "[INFO]Starting minikube cluster '$CLUSTER'"
-      minikube -p $CLUSTER start --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800"
+      minikube -p $CLUSTER start --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800" $mount_command
       minikube profile $CLUSTER
       minikube -p $CLUSTER addons enable metrics-server
       minikube -p $CLUSTER addons enable dashboard
