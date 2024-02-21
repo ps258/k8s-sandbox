@@ -1284,6 +1284,8 @@ if [[ $# -gt 0 ]]; then
         fi
       done
       tidyPVCs
+      # minikube doesn't always remove the PVs properly. Lets get rid of them properly
+      minikube -p $CLUSTER ssh -- "test -d /var/hostpath-provisioner/$NAMESPACE/ && sudo rm -rf /var/hostpath-provisioner/$NAMESPACE/" 2>/dev/null
       ;;
 
     help)
