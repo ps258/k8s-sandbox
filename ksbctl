@@ -732,13 +732,13 @@ function loadVersions {
   line=$1
   IFS=,
   echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers MDCBvers
-  export KSBX_GATE_VERS="v${gwVers%%-*}"
+  export KSBX_GATE_VERS="v${gwVers%%-1}"
   KSBX_GATE_VERS=$(echo $KSBX_GATE_VERS | sed 's/~/-/g')
   if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
-    export KSBX_DASH_VERS="v${dshbVers%%-*}"
-    export KSBX_PUMP_VERS="v${pumpVers%%-*}"
+    export KSBX_DASH_VERS="v${dshbVers%%-1}"
+    export KSBX_PUMP_VERS="v${pumpVers%%-1}"
     if [[ $KSBX_TYPE == 'mdcb' ]]; then
-      export KSBX_MDCB_VERS="v${MDCBvers%%-*}"
+      export KSBX_MDCB_VERS="v${MDCBvers%%-1}"
     fi
   fi
 }
