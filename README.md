@@ -76,9 +76,9 @@
       ksbctl versions
             Show the image version of each pod in each deployment
 
-Environment variable meanings:
-      KSBCTL_CLUSTER: use the named cluster rather than the default 'minikube'
-                      This can also be specified by 'ksbctl -C CLUSTERNAME create' etc.
-      KSBX_OPERATOR_VERSION: use the named Tyk operator release when setting up operator using
-                      ksbctl setup operator
+      Environment variable meanings:
+            KSBCTL_CLUSTER: use the named cluster rather than the default 'minikube'
+                            This can also be specified by 'ksbctl -C CLUSTERNAME create' etc.
+            KSBX_OPERATOR_VERSION: use the named Tyk operator release when setting up operator using
+                            ksbctl setup operator
 
