@@ -1159,6 +1159,7 @@ if [[ $# -gt 0 ]]; then
           createNamespace
           if [[ -n $ENV_VAR_FILE ]]; then
             # create a config map to hold the environment variables
+            echo "[INFO]Adding environment variables from $ENV_VAR_FILE to configmap sandbox-env-vars"
             kubectl create configmap sandbox-env-vars --from-env-file=$ENV_VAR_FILE -n $NAMESPACE
           fi
           if [[ $KSBX_DATABASE == 'mongo' ]]; then
