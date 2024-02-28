@@ -62,6 +62,7 @@ KSBX_PUMP_VERS=''
 KSBX_MDCB_VERS=''
 KSBX_MDCB_LICENSE=''
 KSBX_NS=''
+KSBX_LOG_LEVEL=debug
 MONGOSHELL=''
 INSTALL_OPR_CONTEXT=false
 BOOTSTRAP=true
@@ -94,6 +95,7 @@ function help {
   echo "      -E A file to read environment variables from and add them all deployments"
   echo "      -h Setup the edge gateways to use https (implies -m and incompatible with -i)"
   echo "      -i Add the istio label to the namespace so istio is injected into the pods"
+  echo "      -l set the log level of the containers (debug, info, warning or error)"
   echo "      -m Run MDCB and configure edge gateways"
   echo "      -N Use the given namespace name rather than the next available sandbox"
   echo "         Useful when there's a need to import apis and policy YAML with set namespace"
@@ -1006,7 +1008,7 @@ if [[ $# -gt 0 ]]; then
 
     create)
       shift
-      while getopts :c:de:E:himN:nopst:v: arg; do
+      while getopts :c:de:E:hil:mN:nopst:v: arg; do
         case $arg in
           c)
             # the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -1038,14 +1040,23 @@ if [[ $# -gt 0 ]]; then
                 ;;
             esac
             ;;
+          h)
+            INSTALL_EDGE=true
+            ENABLE_HTTPS=true
+            ;;
           i)
             # add the istio label to the namespace so it's picked up by istio
             ENABLE_ISTIO=true
             EXTRA_NAMESPACE_LABELS="$ISTIO_INJECTION_LABEL $EXTRA_NAMESPACE_LABELS"
             ;;
-          h)
-            INSTALL_EDGE=true
-            ENABLE_HTTPS=true
+          l)
+            # set the loglevel
+            if echo $OPTARG | egrep -qw 'debug|info|warning|error'; then
+              KSBX_LOG_LEVEL=$OPTARG
+            else
+              echo "[FATAL]Loglevel must be one of debug, info, warnding or error"
+              exit 1
+            fi
             ;;
           m)
             # deploy with MDCB, edge redis and edge gateways

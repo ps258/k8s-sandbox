@@ -34,7 +34,7 @@ spec:
           privileged: true
         env:
           - name: TYK_LOGLEVEL
-            value: "debug"
+            value: "${KSBX_LOG_LEVEL}"
         command: ["/opt/tyk-pump/tyk-pump", "--conf=/etc/tyk-pump/pump.conf"]
         workingDir: /opt/tyk-pump
         ports:
