@@ -97,7 +97,7 @@ data:
         "key_space_sync_interval": 10,
         "rpc_key": "$KSBX_ORG_ID",
         "ssl_insecure_skip_verify": true,
-        "synchroniser_enabled": true,
+        "synchroniser_enabled": $KSBX_SYNC_ENABLED,
         "use_rpc": true,
         "use_ssl": false
       },

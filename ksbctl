@@ -71,7 +71,8 @@ export KSBX_PGUSER=postgresx      # default postgres username
 export KSBX_PGDB=tyk_analytics    # default postgres database
 export KSBX_CONTROL_GATEWAY_REPLICAS=1  # default number of control gateways to run
 export KSBX_EDGE_GATEWAY_REPLICAS=1     # default number of edge gateways to run
-export KSBX_LOG_LEVEL=debug                    # the default log level
+export KSBX_LOG_LEVEL=debug       # the default log level
+export KSBX_SYNC_ENABLED=false    # enable the MDCB synchroniser
 # KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s (Overridden by SBX_HOST_IP_ADDR if it's defined)
 export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}' | sort -n | head -1)
 ENVFILE=~/.tyk-sandbox
@@ -103,6 +104,7 @@ function help {
   echo "      -o Create OperatorContext for Tyk Operator"
   echo "      -p Deploy with postgres not mongo"
   echo "      -s Deploy a stand alone gateway"
+  echo "      -S Enable the MDCB synchroniser"
   echo "      -t Description of the sandbox namespace"
   echo "      -v Version tag. The file $VERSIONFILE contains the versions used"
   echo "$name delete <sandbox namespace...>"
@@ -1008,7 +1010,7 @@ if [[ $# -gt 0 ]]; then
 
     create)
       shift
-      while getopts :c:de:E:hil:mN:nopst:v: arg; do
+      while getopts :c:de:E:hil:mN:nopsSt:v: arg; do
         case $arg in
           c)
             # the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -1083,6 +1085,10 @@ if [[ $# -gt 0 ]]; then
             # use postgresql not mongodb
             # defaults to mongo without this
             KSBX_DATABASE=postgres
+            ;;
+          S)
+            # enable the MDCB synchroniser
+            KSBX_SYNC_ENABLED=true
             ;;
           s)
             # create a CE deployment
