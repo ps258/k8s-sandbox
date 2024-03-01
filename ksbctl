@@ -62,7 +62,6 @@ KSBX_PUMP_VERS=''
 KSBX_MDCB_VERS=''
 KSBX_MDCB_LICENSE=''
 KSBX_NS=''
-KSBX_LOG_LEVEL=debug
 MONGOSHELL=''
 INSTALL_OPR_CONTEXT=false
 BOOTSTRAP=true
@@ -72,6 +71,7 @@ export KSBX_PGUSER=postgresx      # default postgres username
 export KSBX_PGDB=tyk_analytics    # default postgres database
 export KSBX_CONTROL_GATEWAY_REPLICAS=1  # default number of control gateways to run
 export KSBX_EDGE_GATEWAY_REPLICAS=1     # default number of edge gateways to run
+export KSBX_LOG_LEVEL=debug                    # the default log level
 # KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s (Overridden by SBX_HOST_IP_ADDR if it's defined)
 export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}' | sort -n | head -1)
 ENVFILE=~/.tyk-sandbox
