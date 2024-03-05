@@ -290,11 +290,17 @@ function setupMinikubeStorage {
 }
 
 function startMinikube {
+  typeset quiet
+  if [[ $# > 0 ]]; then
+    quiet=true
+  fi
   if minikubeProfileExists; then
     if [[ $(minikube profile list | awk '/'$CLUSTER'/ {print $14}') = 'Stopped' ]]; then
       minikube -p $CLUSTER start
     else
-      echo "[WARN]Minikube cluser '$CLUSTER' is already running"
+      if [[ -z $quiet ]]; then
+        echo "[WARN]Minikube cluser '$CLUSTER' is already running"
+      fi
     fi
   else
     echo "[FATAL]Minikube profile '$CLUSTER' does not exist. Use '$SCRIPTNAME -C $CLUSTER init' to create it"
@@ -1006,6 +1012,7 @@ if [[ $# -gt 0 ]]; then
   fi
   # setup global aliases and variables
   setGlobals
+  startMinikube quiet
   case $1 in 
 
     create)
