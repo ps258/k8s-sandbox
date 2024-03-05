@@ -897,7 +897,7 @@ function publishAPIs {
           curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfile"
         else
           # deal with the files that are exported APIs from the dashboard
-          APIfileName=$(mktemp /tmp/$(basename "$APIfile").XXXXXX)
+          APIfileName=$(mktemp "/tmp/$(basename '$APIfile').XXXXXX")
           createApiDefintion "$APIfile" > $APIfileName
           curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfileName" 
           \rm $APIfileName
