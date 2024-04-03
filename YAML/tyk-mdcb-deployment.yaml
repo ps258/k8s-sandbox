@@ -34,7 +34,7 @@ spec:
           privileged: true
         env:
           - name: TYK_MDCB_LOGLEVEL
-            value: "debug"
+            value: "${KSBX_LOG_LEVEL}"
         command: ["/opt/tyk-sink/tyk-sink", "-c", "/etc/tyk-sink/tyk_sink.conf"]
         workingDir: /opt/tyk-sink
         ports:
