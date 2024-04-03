@@ -41,6 +41,7 @@ SCRIPTDIR=$(
   cd "$(dirname $SCRIPTNAME)"
   echo $PWD
 )
+SCRIPTNAME=$(basename $SCRIPTNAME)
 
 VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
 YAMLDIR="$SCRIPTDIR/YAML"
@@ -1006,6 +1007,7 @@ if [[ $# -gt 0 ]]; then
   if ! minikubeProfileExists ; then
     if [[ $1 != 'init' ]]; then
       echo "[FATAL]Minikube cluster '$CLUSTER' not initialised"
+      echo "[INFO]Run: $SCRIPTNAME init"
       minikube profile list 2>/dev/null
       exit 1
     fi
