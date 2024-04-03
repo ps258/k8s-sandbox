@@ -36,7 +36,7 @@ data:
         "type": "redis"
       },
       "sync_worker_config": {
-        "enabled": true,
+        "enabled": $KSBX_SYNC_ENABLED,
         "hash_keys": false
       }
     }
