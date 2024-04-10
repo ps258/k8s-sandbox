@@ -584,7 +584,9 @@ function createNamespace {
       echo "  KSBX_MDCB: $KSBX_MDCB_VERS" >> $configYAML
     fi
     echo "  KSBX_TYPE: $KSBX_TYPE" >> $configYAML
-    echo "  KSBX_DATABASE: $KSBX_DATABASE" >> $configYAML
+    if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
+      echo "  KSBX_DATABASE: $KSBX_DATABASE" >> $configYAML
+    fi
     echo "  KSBX_DESCRIPTION: \"$KSBX_DESCRIPTION\"" >> $configYAML
     echo "kind: ConfigMap" >> $configYAML
     echo "metadata:" >> $configYAML
@@ -1433,6 +1435,8 @@ if [[ $# -gt 0 ]]; then
             echo http://$IP:$(getControlGatewayPort)/
           elif [[ $KSBX_TYPE == 'standalone' ]]; then
             echo http://$IP:$(getStandaloneGatewayPort)/
+          elif [[ $KSBX_TYPE == 'hybrid' ]]; then
+            echo http://$IP:$(getHybridGatewayPort)/
           fi
           ;;
         control-r*|redis)
@@ -1450,6 +1454,14 @@ if [[ $# -gt 0 ]]; then
           else
             echo "[FATAL]Install is of type $KSBX_TYPE: No edge" 1>&2
             exit 1
+          fi
+          ;;
+        hybrid-r*|redis)
+          echo "-h $IP -p $(getHybridRedisPort)"
+          ;;
+        hybrid-g*|gate*)
+          if [[ $KSBX_TYPE == 'hybrid' ]]; then
+            echo http://$IP:$(getHybridGatewayPort)/
           fi
           ;;
         edge-r*)
