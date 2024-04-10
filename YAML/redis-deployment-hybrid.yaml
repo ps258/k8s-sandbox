@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hybrid-redis
+  labels:
+    app: redis
+    plane: hybrid
+spec:
+  selector:
+    matchLabels:
+      app: redis
+      plane: hybrid
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: redis
+        plane: hybrid
+    spec:
+      volumes:
+        - name: hybrid-redis-vol
+          persistentVolumeClaim:
+            claimName: ${KSBX_NS}-hybrid-redis-pvc
+      containers:
+      - name: master
+        image: redis:5.0.3
+        command: ["redis-server", "--save 10 1"]
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+          - mountPath: /data
+            name: hybrid-redis-vol

@@ -76,6 +76,7 @@ export KSBX_LOG_LEVEL=debug       # the default log level
 export KSBX_SYNC_ENABLED=false    # enable the MDCB synchroniser
 # KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s (Overridden by SBX_HOST_IP_ADDR if it's defined)
 export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}' | sort -n | head -1)
+KSBX_CONTROL_PLANE=''
 ENVFILE=~/.tyk-sandbox
 SBX_LICENSE=""
 SBX_MDCB_LICENSE=""
@@ -95,6 +96,7 @@ function help {
   echo "      -d Don't publish any sample APIs"
   echo "      -e The number of edge gateway replicas to run"
   echo "      -E A file to read environment variables from and add them all deployments"
+  echo "      -H Setup hybrid install. Provide the control plane k-sandbox here"
   echo "      -h Setup the edge gateways to use https (implies -m and incompatible with -i)"
   echo "      -i Add the istio label to the namespace so istio is injected into the pods"
   echo "      -l set the log level of the containers (debug, info, warning or error)"
@@ -480,6 +482,10 @@ function getControlRedisPort {
   kubectl get svc -n $NAMESPACE control-redis --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
+function getHybridRedisPort {
+  kubectl get svc -n $NAMESPACE hybrid-redis --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
 function getDashboardPort {
   kubectl get svc -n $NAMESPACE tyk-dashboard --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
@@ -498,6 +504,10 @@ function getEdgeGatewayPort {
 
 function getStandaloneGatewayPort {
   kubectl get svc -n $NAMESPACE standalone-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
+function getHybridGatewayPort {
+  kubectl get svc -n $NAMESPACE hybrid-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
 function reportSanboxInfo {
@@ -530,9 +540,12 @@ function reportSanboxInfo {
     fi
     echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
     echo "$NAMESPACE.OrgID:             $(getOrgID)"
-  else
+  elif [[ $KSBX_TYPE == "standalone" ]]; then
     echo "$NAMESPACE.gateway:   http://$IP:$(getStandaloneGatewayPort)/"
     echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getControlRedisPort)"
+  elif [[ $KSBX_TYPE == "hybrid" ]]; then
+    echo "$NAMESPACE.gateway:   http://$IP:$(getHybridGatewayPort)/"
+    echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getHybridRedisPort)"
   fi
   # if the namespace has the label 'istio-injection=enabled' then report the istio-system services
   if kubectl get ns --show-labels --no-headers=true $NAMESPACE | grep -q $ISTIO_INJECTION_LABEL; then
@@ -1019,7 +1032,7 @@ if [[ $# -gt 0 ]]; then
 
     create)
       shift
-      while getopts :c:de:E:hil:mN:nopsSt:v: arg; do
+      while getopts :c:de:E:hH:il:mN:nopsSt:v: arg; do
         case $arg in
           c)
             # the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -1050,6 +1063,15 @@ if [[ $# -gt 0 ]]; then
                 exit 1
                 ;;
             esac
+            ;;
+          H)
+            # deploy a hybrid instance
+						if ! namespaceExists $OPTARG; then
+              echo "[FATAL]Control plane namespace '$OPTARG' does not exist"
+              exit 1
+            fi
+            KSBX_CONTROL_PLANE=$OPTARG
+            KSBX_TYPE=hybrid
             ;;
           h)
             INSTALL_EDGE=true
@@ -1135,7 +1157,7 @@ if [[ $# -gt 0 ]]; then
         checkMDCBlicence
       fi
       if [[ -z $sandboxVersion ]]; then
-        echo "[FATAL]Must specify a sandbox version"
+        echo "[FATAL]Must specify a release version"
         help
         exit 1
       fi
@@ -1148,12 +1170,23 @@ if [[ $# -gt 0 ]]; then
           echo "[FATAL]Cannot currently deploy the standalone gateway with https. Use -h or -s not both"
           exit 1
         fi
+        if [[ $KSBX_TYPE == 'hybrid' ]]; then
+          echo "[FATAL]Cannot currently deploy the hybrid gateway with https. Use -h or -s not both"
+          exit 1
+        fi
       fi
       if [[ $KSBX_TYPE == 'standalone' && $KSBX_DATABASE == 'postgres' ]]; then
-        echo "[WARN]Stand alone deployments don't use mongo or postgres. Ignoring -p"
+        echo "[WARN]Standalone deployments don't use mongo or postgres. Ignoring -p"
       fi
       if [[ $KSBX_TYPE == 'standalone' && $INSTALL_EDGE == 'true' ]]; then
         echo "[FATAL]Use -m or -s not both. Cannot install MDCB with standalone deployment."
+        exit 1
+      fi
+      if [[ $KSBX_TYPE == 'hybrid' && $KSBX_DATABASE == 'postgres' ]]; then
+        echo "[WARN]Hybrid deployments don't use mongo or postgres. Ignoring -p"
+      fi
+      if [[ $KSBX_TYPE == 'hybrid' && $INSTALL_EDGE == 'true' ]]; then
+        echo "[FATAL]Use -m or -H not both. Cannot install MDCB with hybrid deployment."
         exit 1
       fi
       if [[ $INSTALL_EDGE == 'true' ]]; then
@@ -1255,7 +1288,7 @@ if [[ $# -gt 0 ]]; then
           fi
           listPods
           reportSanboxInfo 
-        else
+        elif [[ $KSBX_TYPE == 'standalone' ]]; then
           # create standalone (CE) deployment of the gateway
           loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
           createNamespace
@@ -1279,6 +1312,26 @@ if [[ $# -gt 0 ]]; then
               deployCRDAPIs $SCRIPTDIR/APIs/*.yaml
             fi
           fi
+          listPods
+          reportSanboxInfo 
+        elif [[ $KSBX_TYPE == 'hybrid' ]]; then
+          # a hybrid deployment with KSBX_CONTROL_PLANE as the control plane
+          loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
+          createNamespace
+          if [[ -n $ENV_VAR_FILE ]]; then
+            # create a config map to hold the environment variables
+            kubectl create configmap sandbox-env-vars --from-env-file=$ENV_VAR_FILE -n $NAMESPACE
+          fi
+          # setup the right variables to substitue in
+          export KSBX_ADMIN_API_KEY=$($SCRIPTNAME get $KSBX_CONTROL_PLANE key)
+          export KSBX_MDCB_URL=$($SCRIPTNAME get $KSBX_CONTROL_PLANE mdcb)
+          export KSBX_ORG_ID=$($SCRIPTNAME get $KSBX_CONTROL_PLANE orgid)
+          applyYAMLtemplate redis-PersistentVolumeClaim-hybrid.yaml redis-deployment-hybrid.yaml redis-svc-hybrid.yaml
+          waitDeploymentReady hybrid-redis
+          applyYAMLtemplate tyk-gateway-configmap-hybrid.yaml
+          applyYAMLtemplate tyk-gateway-deployment-hybrid.yaml
+          applyYAMLtemplate tyk-gateway-svc-hybrid.yaml
+          waitDeploymentReady hybrid-gateway
           listPods
           reportSanboxInfo 
         fi
