@@ -1190,14 +1190,14 @@ if [[ $# -gt 0 ]]; then
           fi
           if [[ $KSBX_DATABASE == 'mongo' ]]; then
             echo "[INFO]Starting redis and mongo in the control plane"
-            applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
+            applyYAMLtemplate redis-PersistentVolumeClaim-control.yaml redis-deployment-control.yaml redis-svc-control.yaml
             applyYAMLtemplate mongo-PersistentVolumeClaim.yaml mongo-deployment.yaml mongo-svc.yaml
             # applyYAMLtemplate grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
             waitDeploymentReady control-redis
             waitDeploymentReady mongo-db
           elif [[ $KSBX_DATABASE == 'postgres' ]]; then
             echo "[INFO]Starting redis and postgres in the control plane"
-            applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
+            applyYAMLtemplate redis-PersistentVolumeClaim-control.yaml redis-deployment-control.yaml redis-svc-control.yaml
             applyYAMLtemplate postgres-PersistentVolumeClaim.yaml postgres-deployment.yaml postgres-svc.yaml
             # applyYAMLtemplate grpc-plugin-deployment.yaml grpc-plugin-svc.yaml
             waitDeploymentReady control-redis
@@ -1212,7 +1212,7 @@ if [[ $# -gt 0 ]]; then
             applyYAMLtemplate tyk-dashboard-configmap-postgres.yaml tyk-pump-configmap-postgres.yaml
           fi
           # create dashboard, control gateway and pump deployments
-          applyYAMLtemplate tyk-dashboard-deployment.yaml tyk-gateway-control-deployment.yaml tyk-pump-deployment.yaml
+          applyYAMLtemplate tyk-dashboard-deployment.yaml tyk-gateway-deployment-control.yaml tyk-pump-deployment.yaml
           # create dashboard and control gateway services
           applyYAMLtemplate tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
           waitDeploymentReady tyk-dashboard
@@ -1224,7 +1224,7 @@ if [[ $# -gt 0 ]]; then
             export KSBX_ADMIN_API_KEY=$(getAdminUserKey)
             export KSBX_ORG_ID=$(getOrgID)
             enableHybrid $KSBX_ORG_ID $KSBX_ADMIN_API_KEY
-            applyYAMLtemplate edge-redis-PersistentVolumeClaim.yaml edge-redis-deployment.yaml edge-redis-svc.yaml
+            applyYAMLtemplate redis-PersistentVolumeClaim-edge.yaml redis-deployment-edge.yaml redis-svc-edge.yaml
             applyYAMLtemplate tyk-gateway-configmap-edge.yaml
             if [[ $KSBX_DATABASE == 'mongo' ]]; then
               applyYAMLtemplate tyk-mdcb-configmap-mongo.yaml
@@ -1236,7 +1236,7 @@ if [[ $# -gt 0 ]]; then
             applyYAMLtemplate tyk-mdcb-deployment.yaml tyk-mdcb-svc.yaml
             waitDeploymentReady tyk-sink
             # deploy edge gateway(s)
-            applyYAMLtemplate tyk-gateway-edge-deployment.yaml
+            applyYAMLtemplate tyk-gateway-deployment-edge.yaml
             if [[ $ENABLE_HTTPS == 'true' ]]; then
               enableEdgeHttps
             fi
@@ -1263,10 +1263,10 @@ if [[ $# -gt 0 ]]; then
             # create a config map to hold the environment variables
             kubectl create configmap sandbox-env-vars --from-env-file=$ENV_VAR_FILE -n $NAMESPACE
           fi
-          applyYAMLtemplate control-redis-PersistentVolumeClaim.yaml control-redis-deployment.yaml control-redis-svc.yaml
+          applyYAMLtemplate redis-PersistentVolumeClaim-control.yaml redis-deployment-control.yaml redis-svc-control.yaml
           waitDeploymentReady control-redis
           applyYAMLtemplate tyk-gateway-configmap-standalone.yaml
-          applyYAMLtemplate tyk-gateway-standalone-deployment.yaml
+          applyYAMLtemplate tyk-gateway-deployment-standalone.yaml
           applyYAMLtemplate tyk-gateway-svc-standalone.yaml
           waitDeploymentReady standalone-gateway
           if [[ $INSTALL_OPR_CONTEXT == 'true' ]]; then
