@@ -3,6 +3,7 @@
 # command to manage tyk instances in distinct namespaces
 
 PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
+CDPATH=
 
 # Dependencies
 #  minikube to run a local kubernetes
