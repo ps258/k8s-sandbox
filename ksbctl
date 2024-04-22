@@ -448,12 +448,20 @@ function getDescription {
 function getAdminUserKey {
   typeset redisPort
   typeset redisKey
+  typeset possibleAccessKey
+  typeset UserData_access_key
   redisPort=$(getControlRedisPort)
   for redisKey in $(redis-cli -h $IP -p $redisPort --scan --pattern 'tyk-admin-api-*' 2> /dev/null ); do
-    if [[ $(redis-cli -h $IP -p $redisPort type $redisKey) == 'string' ]]; then
-      if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.user_permissions.IsAdmin) ]]; then
-        redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.access_key 
-        return 0
+    possibleAccessKey=$(echo $redisKey | sed 's/tyk-admin-api-//')
+    if ! echo $possibleAccessKey  | grep -q -- -; then
+      if [[ $(redis-cli -h $IP -p $redisPort type $redisKey) == 'string' ]]; then
+        if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.user_permissions.IsAdmin) ]]; then
+          UserData_access_key=$(redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.access_key )
+          if [[ $UserData_access_key == $possibleAccessKey ]]; then
+            echo $UserData_access_key
+            return 0
+          fi
+        fi
       fi
     fi
   done
@@ -528,7 +536,8 @@ function reportSanboxInfo {
     fi
     if [[ $KSBX_DATABASE == 'mongo' ]]; then
       checkMongoShellInstalled
-      echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $IP --port $(getMongoPort)"
+      #echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $IP --port $(getMongoPort)"
+      echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet mongodb://$IP:$(getMongoPort)/tyk_analytics"
     fi
     if [[ $KSBX_DATABASE == 'postgres' ]]; then
       echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$(getPostgresPort)"
