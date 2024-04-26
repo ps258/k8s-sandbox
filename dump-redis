@@ -6,33 +6,41 @@
 
 PATH=/scripts:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH
 
-PORT=""
-HOST=""
+PORT=''
+HOST=''
 PATTERN='*'
-while getopts :p:h: arg; do
-	case $arg in
-		h)
-			HOST=$OPTARG
-			;;
-		p)
-			PORT=$OPTARG
-			;;
-		:)
-			echo "[FATAL]Option -$OPTARG requires an arguement."
-			exit 1
-			;;
-		\?)
-			echo "[FATAL]Invalid option: -$OPTARG"
-			exit 1
-			;;
-	esac
+while getopts :a:p:h: arg; do
+  case $arg in
+    h)
+      HOST=$OPTARG
+      ;;
+    p)
+      PORT=$OPTARG
+      ;;
+    a)
+      export REDISCLI_AUTH="$OPTARG"
+      ;;
+    :)
+      echo "[FATAL]Option -$OPTARG requires an arguement."
+      exit 1
+      ;;
+    \?)
+      echo "[FATAL]Invalid option: -$OPTARG"
+      exit 1
+      ;;
+  esac
 done
 if [[ -z $HOST || -z $PORT ]]; then
-	echo "[FATAL]Usage $0 -p <port> -h <hostname or IP>"
-	exit 1
+  echo "[FATAL]Usage $0 -p <port> -h <hostname or IP> -a password"
+  exit 1
+else
+  # remove the first 4 commandline arguments to leave the remaining patterns to search for
+  shift 4
 fi
-shift 4
-
+if [[ ! -z $REDISCLI_AUTH ]]; then
+  # remove the next 2 commandline arguments to leave the remaining patterns to search for
+  shift 2
+fi
 
 function dumpRedis {
   typeset REDIS_KEY_PATTERN
@@ -50,7 +58,7 @@ function dumpRedis {
         redis-cli -h $HOST -p $PORT hgetall $key | sed 's/^/  /'
         ;;
       set)
-        redis-cli -h $HOST -p $PORT smembers $key 
+        redis-cli -h $HOST -p $PORT smembers $key
         ;;
       zset)
         echo
