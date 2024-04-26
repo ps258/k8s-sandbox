@@ -303,7 +303,7 @@ function startMinikube {
       minikube -p $CLUSTER start
     else
       if [[ -z $quiet ]]; then
-        echo "[WARN]Minikube cluser '$CLUSTER' is already running"
+        echo "[INFO]Minikube cluser '$CLUSTER' is running"
       fi
     fi
   else
