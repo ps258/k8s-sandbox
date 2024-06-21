@@ -62,7 +62,7 @@ function dumpRedis {
         ;;
       zset)
         echo
-        redis-cli -h $HOST -p $PORT zrange $key 0 -1 withscores | sed 's/^/  /'
+        redis-cli -h $HOST -p $PORT zrange $key 0 -1 withscores | sed 's/^/  /' | awk '/-/ {printf("%s =>  ", $NF)} !/-/ {print $NF}'
         ;;
       string)
         if redis-cli -h $HOST -p $PORT get $key | egrep -q '^{'; then
