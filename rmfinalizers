@@ -15,13 +15,13 @@ for NAMESPACE in $*; do
 	# now delete API definitions
 	echo "[INFO]Deleting ApiDefinitions from $NAMESPACE"
 	for API in $(kubectl get ApiDefinition -n $NAMESPACE --no-headers=true | awk '{print $1}'); do
-		#kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
+		kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
 		kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers)' | kubectl apply -f -
 	done
 	# delete OperatorContext finalizer since it can hang too
 	sleep 1
 	for OC in $(kubectl get OperatorContext -n $NAMESPACE --no-headers=true | awk '{print $1}'); do
-		#kubectl get OperatorContext $OC -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
+		kubectl get OperatorContext $OC -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
 		kubectl get OperatorContext $OC -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers)' | kubectl apply -f -
 	done
 	kubectl delete ApiDefinition --all -n $NAMESPACE
