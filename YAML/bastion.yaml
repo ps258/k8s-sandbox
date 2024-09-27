@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bastion
+  labels:
+    app: bastion
+    plane: control
+spec:
+  replicas: 1
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: bastion
+  template:
+    metadata:
+      labels:
+        app: bastion
+        plane: control
+      annotations:
+    spec:
+      containers:
+      - image: saintpeter/tbi8:latest
+        imagePullPolicy: IfNotPresent
+        name: bastion
+        securityContext:
+          runAsNonRoot: false
+          allowPrivilegeEscalation: true
+          privileged: true
+        command: ["/usr/bin/sleep", "infinity"]
+        workingDir: /
