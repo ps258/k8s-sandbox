@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: httpbin
+  labels:
+    app: httpbin
+    plane: control
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+  type: NodePort
+  selector:
+    app: httpbin
+    plane: control
