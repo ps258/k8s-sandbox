@@ -24,7 +24,7 @@ spec:
       annotations:
     spec:
       containers:
-      - image: centos:7
+      - image: centos:8
         imagePullPolicy: IfNotPresent
         name: centos
         securityContext:
