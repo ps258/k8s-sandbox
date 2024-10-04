@@ -75,6 +75,8 @@ export KSBX_CONTROL_GATEWAY_REPLICAS=1  # default number of control gateways to 
 export KSBX_EDGE_GATEWAY_REPLICAS=1     # default number of edge gateways to run
 export KSBX_LOG_LEVEL=debug       # the default log level
 export KSBX_SYNC_ENABLED=false    # enable the MDCB synchroniser
+export KSBX_REDIS_DB_SIZE=1       # the size to make the redis persistent volume claim for both control plane and edge deployment
+export KSBX_PG_MNGO_DB_SIZE=5     # the size to make the mongo or postgresql DB persistent volume claim
 # KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s (Overridden by SBX_HOST_IP_ADDR if it's defined)
 export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}' | sort -n | head -1)
 KSBX_CONTROL_PLANE=''
@@ -95,6 +97,7 @@ function help {
   echo "      Create a tyk instance in a namespace sandbox with the version given as a tag with -v"
   echo "      -c The number of control plane gateway replicas to run"
   echo "      -d Don't publish any sample APIs"
+  echo "      -D The size of the allocated Mongo or PG storage in GiB (default: $KSBX_PG_MNGO_DB_SIZE)"
   echo "      -e The number of edge gateway replicas to run"
   echo "      -E A file to read environment variables from and add them all deployments"
   echo "      -H Setup hybrid install. Provide the control plane k-sandbox here"
@@ -109,6 +112,7 @@ function help {
   echo "      -p Deploy with postgres not mongo"
   echo "      -s Deploy a stand alone gateway"
   echo "      -S Enable the MDCB synchroniser"
+  echo "      -R The size of the allocated redis control or data plane storage in GiB (default: $KSBX_REDIS_DB_SIZE)"
   echo "      -t Description of the sandbox namespace"
   echo "      -v Version tag. The file $VERSIONFILE contains the versions used"
   echo "$name delete <sandbox namespace...>"
@@ -1044,12 +1048,16 @@ if [[ $# -gt 0 ]]; then
 
     create)
       shift
-      while getopts :c:de:E:hH:il:mN:nopsSt:v: arg; do
+      while getopts :c:D:de:E:hH:il:mN:nopR:sSt:v: arg; do
         case $arg in
           c)
             # the number of control gateways to deploy (these are also just gateways in the pro install)
             # defaults to one
             KSBX_CONTROL_GATEWAY_REPLICAS=$OPTARG
+            ;;
+          D)
+            # The size of the allocated Mongo or PG storage in GiB
+            KSBX_PG_MNGO_DB_SIZE=$(echo $OPTARG | tr -cd 0-9)
             ;;
           d)
             # Don't publish any APIs
@@ -1128,6 +1136,10 @@ if [[ $# -gt 0 ]]; then
             # use postgresql not mongodb
             # defaults to mongo without this
             KSBX_DATABASE=postgres
+            ;;
+          R)
+            # The size of the allocated control and data plane redis storage in GiB
+            KSBX_REDIS_DB_SIZE=$(echo $OPTARG | tr -cd 0-9)
             ;;
           S)
             # enable the MDCB synchroniser
