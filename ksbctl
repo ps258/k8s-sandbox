@@ -1248,6 +1248,8 @@ if [[ $# -gt 0 ]]; then
             waitDeploymentReady control-redis
             waitDeploymentReady postgres-db
           fi
+          echo "[INFO]Deploying httpbin and a bastion container"
+          applyYAMLtemplate httpbin-deployment.yaml httpbin-svc-control.yaml bastion.yaml
           echo "[INFO]Starting dashboard, pump and gateway"
           # setup configmaps first
           applyYAMLtemplate tyk-gateway-configmap-control.yaml
