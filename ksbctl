@@ -89,6 +89,8 @@ PUBLISH_APIS=true
 ENV_VAR_FILE=""
 OPERATOR_CONTEXT_NAME=local-operator-context
 OPERATOR_MASK_URL=http://httpbin.org/anything/200
+INT_DSHB_URL=http://tyk-dashboard:3000
+INT_CPGW_URL=http://control-gateway:8080
 
 function help {
   typeset name
@@ -471,7 +473,7 @@ function getAdminUserKey {
 }
 
 function getOrgID {
-  curl -s -H "admin-auth: $KSBX_ADMIN_SECRET" http://$IP:$(getDashboardPort)/admin/organisations/ | jq -r .organisations[0].id
+  kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/getOrganisations.py --dashboard $INT_DSHB_URL --adminSecret $KSBX_ADMIN_SECRET | head -1 | cut -d, -f1
 }
 
 function getPostgresPort {
@@ -713,8 +715,7 @@ function getPodNames {
 function bootstrapPro {
   if [[ -n $SBX_LICENSE && -n $SBX_USER && -n $SBX_PASSWORD ]]; then
     SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
-    echo "[DEBUG]"kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/bootstrap.py --dashboard http://tyk-dashboard:3000 --adminSecret $KSBX_ADMIN_SECRET --licence $SBX_LICENSE --adminEmail $SBX_USER --adminPassword $SBX_CLEAR_PASSWORD
-    kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/bootstrap.py --dashboard http://tyk-dashboard:3000 --adminSecret $KSBX_ADMIN_SECRET --licence $SBX_LICENSE --adminEmail $SBX_USER --adminPassword $SBX_CLEAR_PASSWORD
+    kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/bootstrap.py --dashboard $INT_DSHB_URL --adminSecret $KSBX_ADMIN_SECRET --licence $SBX_LICENSE --adminEmail $SBX_USER --adminPassword $SBX_CLEAR_PASSWORD
   fi
 }
 
@@ -846,8 +847,7 @@ function enableHybrid {
   dashboardPort=$(getDashboardPort)
   orgID=$1
   echo "[INFO]Enabling hybrid on org_id $orgID"
-  orgJSON=$(curl -s http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" | jq ".hybrid_enabled = true")
-  curl -sX PUT http://$IP:$dashboardPort/admin/organisations/$orgID -H "Admin-Auth: $KSBX_ADMIN_SECRET" -d "$orgJSON"
+  kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/enableHybrid.py --dashboard $INT_DSHB_URL --adminSecret $KSBX_ADMIN_SECRET --orgid $orgid
 }
 
 # create a self signed certificate, load it into the certificate store and apply the config to the edge gateways
@@ -870,7 +870,7 @@ function enableEdgeHttps {
   kubectl label deployment edge-gateway https=true -n $NAMESPACE
   # generate the edge gateway certificate
   SAN="DNS:localhost, DNS:*.$NAMESPACE.svc.cluster.local"
-  SUBJECT="/emailAddress=email@company.com/C=GB/ST=K8s Sandbox/L=$(date +"%Y-%b-%d %T %Z")/O=Support/OU=Team/CN=$NAMESPACE"
+  SUBJECT="/emailAddress=$NAMESPACE@company.com/C=GB/ST=K8s Sandbox/L=$(date +"%Y-%b-%d %T %Z")/O=Support/OU=Team/CN=$NAMESPACE"
   GW_KEY_FILE=$(mktemp /tmp/XXXXX-gateway-key.pem)
   GW_CRT_FILE=$(mktemp /tmp/XXXXX-gateway-certificate.pem)
   GW_CSR_FILE=$(mktemp /tmp/XXXXX-certificate.csr)
