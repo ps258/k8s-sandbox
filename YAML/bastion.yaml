@@ -24,7 +24,7 @@ spec:
       annotations:
     spec:
       containers:
-      - image: saintpeter/tbi8:latest
+      - image: saintpeter/tbi9:latest
         imagePullPolicy: IfNotPresent
         name: bastion
         securityContext:

@@ -356,7 +356,6 @@ function setupHelmAndOperator {
     echo "[INFO]Sleeping for 30 seconds to allow the cert-manager to start, be patient"
     sleep 30
     kubectl create namespace tyk-operator-system
-    #kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
     kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true"
     helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
     helm repo update
@@ -703,6 +702,22 @@ function addEnvVars {
   yq eval '(.spec.template.spec.containers[0].envFrom) += [{"configMapRef": {"name": "sandbox-env-vars"}}]' -i $YAMLfile
 }
 
+function getPodNames {
+  typeset podname
+  podname="$1"
+  kubectl get pods -n $NAMESPACE | awk '/'$podname'/ {print $1}' | xargs
+}
+
+# bootstrap the dashboard and add the admin user
+# This replaces licenseDashboard and addDashboardUser
+function bootstrapPro {
+  if [[ -n $SBX_LICENSE && -n $SBX_USER && -n $SBX_PASSWORD ]]; then
+    SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
+    echo "[DEBUG]"kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/bootstrap.py --dashboard http://tyk-dashboard:3000 --adminSecret $KSBX_ADMIN_SECRET --licence $SBX_LICENSE --adminEmail $SBX_USER --adminPassword $SBX_CLEAR_PASSWORD
+    kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/bootstrap.py --dashboard http://tyk-dashboard:3000 --adminSecret $KSBX_ADMIN_SECRET --licence $SBX_LICENSE --adminEmail $SBX_USER --adminPassword $SBX_CLEAR_PASSWORD
+  fi
+}
+
 # apply the licence to the dashboard
 function licenseDashboard {
   if [[ -n $SBX_LICENSE ]]; then
@@ -790,7 +805,7 @@ function runShell {
   for podPartName in $*
   do
     echo "[INFO]Creating shell for $podPartName"
-    for pod in $(kubectl get pods -n $NAMESPACE | awk '/'$podPartName'/ {print $1}')
+    for pod in $(getPodNames $podPartName)
     do
       # if ncurses-base isnt installed then TERM isn't recognised
       # I found it was installed in some images but not others
@@ -812,7 +827,7 @@ function showLogs {
   typeset podPartName
   typeset pod
   podPartName=$1
-  pod=$(kubectl get pods -n $NAMESPACE | awk '/'$podPartName'/ {print $1}' | head -1)
+  pod=$(getPodNames $podPartName | sort | head -1)
   if [[ -n $pod ]]; then
     echo "[INFO]kubectl logs -n $NAMESPACE $pod -f"
     kubectl logs -n $NAMESPACE $pod -f
@@ -1276,8 +1291,9 @@ if [[ $# -gt 0 ]]; then
           applyYAMLtemplate tyk-dashboard-svc.yaml tyk-gateway-svc-control.yaml
           waitDeploymentReady tyk-dashboard
           waitDeploymentReady control-gateway
-          licenseDashboard
-          addDashboardUser
+          bootstrapPro
+          #licenseDashboard
+          #addDashboardUser
           if [[ $KSBX_TYPE == 'mdcb' ]]; then
             # add edge redis and edge gateways
             export KSBX_ADMIN_API_KEY=$(getAdminUserKey)
@@ -1636,7 +1652,7 @@ if [[ $# -gt 0 ]]; then
         echo "[FATAL]Must provide namespace and podname"
         exit 1
       fi
-      monitorPodName=$(kubectl get pods -n $NAMESPACE | awk '/'$2'/ {print $1}' | head -1)
+      monitorPodName=$(getPodNames "$2" | head -1)
       echo "[INFO]Monitoring $monitorPodName CPU and Memory every $POD_MONITOR_FREQ s"
       echo "[INFO]kubectl top pod $monitorPodName -n $NAMESPACE --containers --no-headers=true"
       while true; do
