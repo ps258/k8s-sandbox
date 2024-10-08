@@ -37,7 +37,6 @@ alias kubectl="kubectl --cluster=$CLUSTER"
 alias helm="helm --kube-context $CLUSTER"
 
 SCRIPTNAME=$0
-PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:$PATH
 SCRIPTDIR=$(
   cd "$(dirname $SCRIPTNAME)"
   echo $PWD
@@ -804,6 +803,10 @@ function loadVersions {
 function runShell {
   typeset podPartName
   typeset pod
+  typeset adminKey
+  typeset orgid
+  adminKey=$(getAdminUserKey)
+  orgid=$(getOrgID)
   for podPartName in $*
   do
     echo "[INFO]Creating shell for $podPartName"
@@ -818,8 +821,8 @@ function runShell {
         kubectl exec $pod -n $NAMESPACE -- apt install ncurses-base -y > /dev/null 2>&1
       fi
       echo "[INFO]starting bash in $pod"
-      echo "[INFO]kubectl exec $pod -n $NAMESPACE -it -- /bin/bash"
-      kubectl exec $pod -n $NAMESPACE -it -- /bin/bash
+      echo "[INFO]kubectl exec $pod -n $NAMESPACE -it -- env KEY=$adminKey ORG=$orgid DSHB=http://tyk-dashboard:3000/ GW=http://control-gateway:8080/ /bin/bash"
+      kubectl exec $pod -n $NAMESPACE -it -- env KEY=$adminKey ORG=$orgid DSHB=http://tyk-dashboard:3000/ GW=http://control-gateway:8080/ /bin/bash
     done
   done
 }
