@@ -451,17 +451,18 @@ function getDescription {
 
 # hacky way to retrieve an admin user key from redis
 function getAdminUserKey {
-  typeset redisPort
   typeset redisKey
   typeset possibleAccessKey
   typeset UserData_access_key
-  redisPort=$(getControlRedisPort)
-  for redisKey in $(redis-cli -h $IP -p $redisPort --scan --pattern 'tyk-admin-api-*' 2> /dev/null ); do
+  typeset BASTION_POD
+  BASTION_POD=$(getPodNames bastion)
+  for redisKey in $(kubectl exec $BASTION_POD -n $NAMESPACE -- /usr/bin/redis-cli -h control-redis --scan --pattern 'tyk-admin-api-*' 2> /dev/null ); do
     possibleAccessKey=$(echo $redisKey | sed 's/tyk-admin-api-//')
     if ! echo $possibleAccessKey  | grep -q -- -; then
-      if [[ $(redis-cli -h $IP -p $redisPort type $redisKey) == 'string' ]]; then
-        if [[ "admin" == $(redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.user_permissions.IsAdmin) ]]; then
-          UserData_access_key=$(redis-cli -h $IP -p $redisPort get $redisKey 2> /dev/null | jq -r .UserData.access_key )
+      if [[ $(kubectl exec $BASTION_POD -n $NAMESPACE -- /usr/bin/redis-cli -h control-redis type $redisKey) == 'string' ]]; then
+        keyJSON=$(kubectl exec $BASTION_POD -n $NAMESPACE -- /usr/bin/redis-cli -h control-redis get $redisKey 2> /dev/null)
+        if [[ "admin" == $(echo $keyJSON | jq -r .UserData.user_permissions.IsAdmin) ]]; then
+          UserData_access_key=$(echo $keyJSON | jq -r .UserData.access_key )
           if [[ $UserData_access_key == $possibleAccessKey ]]; then
             echo $UserData_access_key
             return 0
@@ -841,13 +842,9 @@ function showLogs {
 # Hybrid needs to be enabled for MDCB installs
 function enableHybrid {
   typeset orgID
-  typeset adminSecret
-  typeset dashboardPort
-  typeset orgJSON
-  dashboardPort=$(getDashboardPort)
   orgID=$1
   echo "[INFO]Enabling hybrid on org_id $orgID"
-  kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/enableHybrid.py --dashboard $INT_DSHB_URL --adminSecret $KSBX_ADMIN_SECRET --orgid $orgid
+  kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/enableHybrid.py --dashboard $INT_DSHB_URL --adminSecret $KSBX_ADMIN_SECRET --org $orgID
 }
 
 # create a self signed certificate, load it into the certificate store and apply the config to the edge gateways
@@ -864,7 +861,6 @@ function enableEdgeHttps {
   typeset SAN
   typeset SUBJECT
   echo "[INFO]Deploying self signed certificate to the edge gateway"
-  DASH_URL=http://$IP:$(getDashboardPort)
   adminKey=$(getAdminUserKey)
   # add a label to the deployment to show that it's https
   kubectl label deployment edge-gateway https=true -n $NAMESPACE
@@ -891,8 +887,11 @@ EOF
 
   openssl x509 -req -in $GW_CSR_FILE -signkey $GW_KEY_FILE -out $GW_CRT_FILE -days 3650 -sha256 -extfile $GW_EXT_FILE
   cat $GW_KEY_FILE >> $GW_CRT_FILE
+  typeset BASTION_POD
+  BASTION_POD=$(getPodNames bastion)
   # add the certificate to the dashboard
-  certID=$(curl -sH "Authorization: $adminKey" "$DASH_URL/api/certs" --form "data=@$GW_CRT_FILE;type=text/plain" | jq -r .id)
+  kubectl cp $GW_CRT_FILE $BASTION_POD:$GW_CRT_FILE -n $NAMESPACE
+  certID=$(kubectl exec $BASTION_POD -n $NAMESPACE -- /tyk-scripts/python/createCert.py --dashboard $INT_DSHB_URL --cred $adminKey --certificate $GW_CRT_FILE | jq -r .id)
   rm -f $GW_KEY_FILE $GW_CSR_FILE $GW_EXT_FILE $GW_CRT_FILE $GW_CRT_FILE
   kubectl get deploy edge-gateway -n $NAMESPACE -o yaml | yq eval \
     '(.spec.template.spec.containers[0].env += { "name": "TYK_GW_HTTPSERVEROPTIONS_USESSL", "value": "True"}) |
@@ -900,7 +899,7 @@ EOF
     (.spec.template.spec.containers[0].readinessProbe.httpGet.scheme = "HTTPS") |
     (.spec.template.spec.containers[0].livenessProbe.httpGet.scheme = "HTTPS")' \
     | kubectl apply -f -
-  }
+}
 
 # Sometimes PersistentVolumeClaim are left when the namespace is deleted.
 # Tidy up any in state 'Released'
@@ -1298,7 +1297,7 @@ if [[ $# -gt 0 ]]; then
             # add edge redis and edge gateways
             export KSBX_ADMIN_API_KEY=$(getAdminUserKey)
             export KSBX_ORG_ID=$(getOrgID)
-            enableHybrid $KSBX_ORG_ID $KSBX_ADMIN_API_KEY
+            enableHybrid $KSBX_ORG_ID
             applyYAMLtemplate redis-PersistentVolumeClaim-edge.yaml redis-deployment-edge.yaml redis-svc-edge.yaml
             applyYAMLtemplate tyk-gateway-configmap-edge.yaml
             if [[ $KSBX_DATABASE == 'mongo' ]]; then
