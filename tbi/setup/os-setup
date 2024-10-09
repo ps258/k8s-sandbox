@@ -1,0 +1,43 @@
+#!/bin/bash
+
+PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH
+SOURCE_DIR=$(dirname $(readlink -f $0))
+
+# setup vimrc for the way I like it
+cp $SOURCE_DIR/vimrc /root/.vimrc
+cp $SOURCE_DIR/curlrc /root/.curlrc
+
+# copy repos into place
+for repo in $SOURCE_DIR/repos/*.repo; do
+	if [[ -f $repo ]]; then
+		cp $repo /etc/yum.repos.d/
+	fi
+done
+# Disable fastestmirror because it sometimes selects a fast but incomplete mirror
+if [[ -f /etc/yum/pluginconf.d/fastestmirror.conf ]]; then
+	sed -i s/enabled=1/enabled=0/ /etc/yum/pluginconf.d/fastestmirror.conf
+fi
+
+if grep -q 'release 9' /etc/redhat-release; then
+	# almalinux:9
+  sed -i 's/$releasever/8/' /etc/yum.repos.d/mongodb-org-4.4.repo
+  yum -y install bash procps-ng iputils net-tools vim-enhanced wget python3 jq diffutils # golang
+fi
+
+yum -y install python3-devel python3-setuptools
+pip3 install --upgrade pip
+pip3 install protobuf grpcio
+if grep -q 'release 9' /etc/redhat-release; then
+	# almalinux:9
+  yum -y install make openssl redis mongodb-mongosh git
+  cd /
+  git clone https://github.com/ps258/tyk-scripts.git
+  cd /tyk-scripts/python
+  pip3 install -r requirements.txt
+  mkdir /root/bin
+  mv $SOURCE_DIR/hey /root/bin
+fi
+
+# tidyup to reduce the image size. Saves 200-300 MB
+# removed to speed up next stage
+#yum clean all
