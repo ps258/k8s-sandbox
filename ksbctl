@@ -805,24 +805,40 @@ function runShell {
   typeset pod
   typeset adminKey
   typeset orgid
+  typeset https
+  typeset TYK_EDGE_GW
   adminKey=$(getAdminUserKey)
   orgid=$(getOrgID)
+  if [[ $KSBX_TYPE == 'mdcb' ]]; then
+    https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json 2>&- | jq -r .metadata.labels.https)
+    if [[ $https == 'true' ]]; then
+      TYK_EDGE_GW="TYK_EDGE_GW=https://edge-gateway:8080"
+    else
+      TYK_EDGE_GW="TYK_EDGE_GW=http://edge-gateway:8080"
+    fi
+  fi
   for podPartName in $*
   do
     echo "[INFO]Creating shell for $podPartName"
     for pod in $(getPodNames $podPartName)
     do
-      # if ncurses-base isnt installed then TERM isn't recognised
-      # I found it was installed in some images but not others
-      echo "[INFO]Checking for ncurses-base in $pod"
-      if ! kubectl exec $pod -n $NAMESPACE -- test -d /lib/terminfo >/dev/null 2>&1; then
-        echo "[INFO]Installing ncurses-base to provide terminal types to the shell"
-        kubectl exec $pod -n $NAMESPACE -- apt-get update > /dev/null 2>&1
-        kubectl exec $pod -n $NAMESPACE -- apt install ncurses-base -y > /dev/null 2>&1
+      echo "[INFO]Starting bash in $pod"
+      echo "[INFO]kubectl exec $pod -n $NAMESPACE -it -- /bin/bash"
+      if echo $pod | grep -q bastion; then
+        # the bastion host is RHEL and setup as I want it so just create a shell
+        # but populate the environment with handy values
+        kubectl exec $pod -n $NAMESPACE -it -- env TYK_KEY=$adminKey TYK_ORG=$orgid TYK_DSHB=$INT_DSHB_URL TYK_GW=$INT_CPGW_URL $TYK_EDGE_GW /bin/bash
+      else
+        # if ncurses-base isnt installed then TERM isn't recognised
+        # I found it was installed in some images but not others
+        # echo "[INFO]Checking for ncurses-base in $pod"
+        if ! kubectl exec $pod -n $NAMESPACE -- test -d /lib/terminfo >/dev/null 2>&1; then
+          echo "[INFO]Installing ncurses-base to provide terminal types to the shell"
+          kubectl exec $pod -n $NAMESPACE -- apt-get update > /dev/null 2>&1
+          kubectl exec $pod -n $NAMESPACE -- apt install ncurses-base -y > /dev/null 2>&1
+        fi
+        kubectl exec $pod -n $NAMESPACE -it -- /bin/bash
       fi
-      echo "[INFO]starting bash in $pod"
-      echo "[INFO]kubectl exec $pod -n $NAMESPACE -it -- env KEY=$adminKey ORG=$orgid DSHB=http://tyk-dashboard:3000/ GW=http://control-gateway:8080/ /bin/bash"
-      kubectl exec $pod -n $NAMESPACE -it -- env KEY=$adminKey ORG=$orgid DSHB=http://tyk-dashboard:3000/ GW=http://control-gateway:8080/ /bin/bash
     done
   done
 }
@@ -1742,6 +1758,7 @@ if [[ $# -gt 0 ]]; then
       NAMESPACE=$(getNamespaceNames $1)
       shift
       if namespaceExists $NAMESPACE; then
+        getInstallType
         runShell $*
       else
         echo "[FATAL]No such ksandbox: $NAMESPACE"
