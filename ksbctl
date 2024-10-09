@@ -275,7 +275,7 @@ function getMinikubeIP {
 
 # checks done to setup env on every run
 function setGlobals {
-  checkCommandInstalled redis-cli jq envsubst psql yq
+  checkCommandInstalled jq envsubst yq
   if which minikube > /dev/null 2>&1 ; then
     #alias kubectl="minikube kubectl -- "
     # check for command dependencies
