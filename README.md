@@ -17,6 +17,9 @@
 	SBX_MDCB_LICENSE=<your MDCB licence>
 ```
 * Deploying with MDCB requires the MDCB license to be in `~/.tyk-sandbox` as above, but ordinary use does not.
+* Deploy a basic config with `./ksbctl create -v 5.0.12 -t "This is my test deployment"`
+* If running on Linux then when the command completes you will be able to access components using the URLs provided
+* Other platforms may need to use minikube magic to make the services available
 
 ### Quick start guide
 
