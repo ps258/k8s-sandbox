@@ -357,7 +357,7 @@ function setupHelmAndOperator {
     echo "[INFO]Sleeping for 30 seconds to allow the cert-manager to start, be patient"
     sleep 30
     kubectl create namespace tyk-operator-system
-    kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true"
+    kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true" --from-literal "TYK_OPERATOR_LICENSEKEY=$(echo $SBX_LICENSE | base64 -w 0)"
     helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
     helm repo update
     echo "[INFO]Attempting to deploy operator using helm. This may take a while"
@@ -366,7 +366,7 @@ function setupHelmAndOperator {
       kubectl delete ns tyk-operator-system --wait
       kubectl create namespace tyk-operator-system
       #kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
-      kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true"
+      kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true" --from-literal "TYK_OPERATOR_LICENSEKEY=$(echo $SBX_LICENSE | base64 -w 0)"
       sleep 10
       echo "[INFO]Reattempting to deploy operator using helm. This may take a while"
       if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system $operatorVersion; then
