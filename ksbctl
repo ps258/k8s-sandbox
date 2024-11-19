@@ -784,10 +784,11 @@ function loadVersions {
   typeset TIBvers
   typeset syncVers
   typeset MDCBvers
+  typeset EDPvers
   typeset version
   line=$1
   IFS=,
-  echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers MDCBvers
+  echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers MDCBvers EDPvers
   export KSBX_GATE_VERS="v${gwVers%%-1}"
   KSBX_GATE_VERS=$(echo $KSBX_GATE_VERS | sed 's/~/-/g')
   if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
