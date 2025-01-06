@@ -106,5 +106,5 @@ data:
         "disable": false
       },
       "use_db_app_configs": true,
-      "use_redis_log": true
+      "use_redis_log": false
     }
