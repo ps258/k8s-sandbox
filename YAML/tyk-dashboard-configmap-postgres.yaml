@@ -68,6 +68,9 @@ data:
           "type": "postgres"
         }
       },
+      "streaming": {
+        "enabled": true
+      },
       "tagging_options": {
         "tag_all_apis_by_org": false
       },
