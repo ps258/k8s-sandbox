@@ -353,7 +353,7 @@ function setupHelmAndOperator {
     operatorVersion="--version $KSBX_OPERATOR_VERSION"
   fi
   if which helm > /dev/null 2>&1; then
-    kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.8.0/cert-manager.yaml --wait
+    kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.17.0/cert-manager.yaml --wait
     echo "[INFO]Sleeping for 30 seconds to allow the cert-manager to start, be patient"
     sleep 30
     kubectl create namespace tyk-operator-system
@@ -957,8 +957,19 @@ function publishAPIs {
     if [[ -n $adminKey ]]; then
       for APIfile in "$@"; do
         echo "[INFO]Publishing API $APIfile"
-        if grep -q api_definition "$APIfile"; then
+        if $(jq 'has("oas")' $APIfile) == "true"; then
+          mv $APIfile tmpfile
+          jq .oas tmpfile > $APIfile
+          rm tmpfile
+          echo curl -X POST -H \"Content-Type: application/json\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis/oas -d@\"$APIfile\"
+          curl -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis/oas -d@"$APIfile"
+        elif grep -q x-tyk-api-gateway "$APIfile"; then
+          # OAS
+          echo curl -X POST -H \"Content-Type: application/json\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis/oas -d@\"$APIfile\"
+          curl -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis/oas -d@"$APIfile"
+        elif grep -q api_definition "$APIfile"; then
           # deal with the files that are a copy and paste of the API JSON from the dashboard
+          echo curl -s -X POST -H \"Content-Type: application/json\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis -d @\"$APIfile\"
           curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfile"
         else
           # deal with the files that are exported APIs from the dashboard
@@ -1121,7 +1132,7 @@ if [[ $# -gt 0 ]]; then
             ;;
           H)
             # deploy a hybrid instance
-						if ! namespaceExists $OPTARG; then
+            if ! namespaceExists $OPTARG; then
               echo "[FATAL]Control plane namespace '$OPTARG' does not exist"
               exit 1
             fi
@@ -1160,12 +1171,12 @@ if [[ $# -gt 0 ]]; then
             ;;
           o)
             # deploy an operator context into the new namespace
-						if namespaceExists tyk-operator-system; then
-							INSTALL_OPR_CONTEXT=true
-						else
-							echo "[FATAL]Tyk operator is not installed. Install with '$SCRIPTNAME setup operator'"
-							exit 1
-						fi
+            if namespaceExists tyk-operator-system; then
+              INSTALL_OPR_CONTEXT=true
+            else
+              echo "[FATAL]Tyk operator is not installed. Install with '$SCRIPTNAME setup operator'"
+              exit 1
+            fi
             ;;
           p)
             # use postgresql not mongodb
