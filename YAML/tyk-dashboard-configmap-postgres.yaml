@@ -13,7 +13,8 @@ data:
       "audit": {
         "detailed_recording": true,
         "enabled": true,
-        "format": "text",
+        "format": "json",
+        "store_type": "db",
         "path": "/var/log/tyk-dashboard_audit.log"
       },
       "enable_aggregate_lookups": true,
