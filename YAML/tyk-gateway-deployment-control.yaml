@@ -25,7 +25,7 @@ spec:
       annotations:
     spec:
       containers:
-      - image: tykio/tyk-gateway:$KSBX_GATE_VERS
+      - image: tykio/tyk-gateway$KSBX_GATE_EE:$KSBX_GATE_VERS
         imagePullPolicy: IfNotPresent
         name: tyk-gateway
         securityContext:

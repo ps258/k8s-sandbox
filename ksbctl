@@ -58,6 +58,7 @@ ENABLE_HTTPS=false
 ENABLE_ISTIO=false
 sandboxVersion=''
 KSBX_GATE_VERS=''
+KSBX_GATE_EE=''
 KSBX_DASH_VERS=''
 KSBX_PUMP_VERS=''
 KSBX_MDCB_VERS=''
@@ -673,6 +674,7 @@ function OperatorContextExists {
 # Process the YAML with envsubst to substitute environment variables into them
 # All exported environment varables are available to envsubst but these are the main ones
 # KSBX_GATE_VERS which has the gateway version. This is used to pull the gateway docker image
+# KSBX_GATE_EE which contains nothing for non-EE gateways and "-ee" for EE gateways
 # KSBX_DASH_VERS which has the dashboard version. This is used to pull the dashboard docker image
 # KSBX_PUMP_VERS which has the pump version. This is used to pull the pump docker image
 # KSBX_MDCB_VERS which has the MDCB version. This is used to pull the MDCB docker image
@@ -791,6 +793,12 @@ function loadVersions {
   IFS=,
   echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers MDCBvers EDPvers
   export KSBX_GATE_VERS="v${gwVers%%-1}"
+  if echo $KSBX_GATE_VERS | grep -q ee; then
+    export KSBX_GATE_EE='-ee'
+  else
+    export KSBX_GATE_EE=''
+  fi
+  KSBX_GATE_VERS=$(echo $KSBX_GATE_VERS | sed 's/ee-//g')
   KSBX_GATE_VERS=$(echo $KSBX_GATE_VERS | sed 's/~/-/g')
   if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
     export KSBX_DASH_VERS="v${dshbVers%%-1}"
