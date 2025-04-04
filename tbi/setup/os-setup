@@ -36,6 +36,7 @@ if grep -q 'release 9' /etc/redhat-release; then
   pip3 install -r requirements.txt
   mkdir /root/bin
   mv $SOURCE_DIR/hey /root/bin
+  mv $SOURCE_DIR/cols /root/bin
 fi
 
 # tidyup to reduce the image size. Saves 200-300 MB
