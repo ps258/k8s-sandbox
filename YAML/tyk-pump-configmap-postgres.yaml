@@ -28,7 +28,7 @@ data:
           "meta": {
             "type": "postgres",
             "connection_string": "user=${KSBX_PGUSER} password=${KSBX_PGPASSWORD} database=${KSBX_PGDB} host=postgres-db port=5432",
-            "table_sharding": false
+            "table_sharding": true
           }
         },
         "sql_aggregate": {
@@ -37,7 +37,7 @@ data:
             "type": "postgres",
             "connection_string": "user=${KSBX_PGUSER} password=${KSBX_PGPASSWORD} database=${KSBX_PGDB} host=postgres-db port=5432",
             "track_all_paths": true,
-            "use_mixed_collection": true
+            "table_sharding": true
           }
         }
       },

@@ -66,7 +66,8 @@ data:
       "storage": {
         "main": {
           "connection_string": "user=${KSBX_PGUSER} password=${KSBX_PGPASSWORD} database=${KSBX_PGDB} host=postgres-db port=5432",
-          "type": "postgres"
+          "type": "postgres",
+          "table_sharding": true
         }
       },
       "streaming": {
@@ -104,5 +105,5 @@ data:
         "portal_section": null,
         "uptime": {}
       },
-      "use_sharded_analytics": false
+      "use_sharded_analytics": true
     }
