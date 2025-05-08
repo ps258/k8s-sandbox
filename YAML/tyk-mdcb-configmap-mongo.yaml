@@ -36,6 +36,7 @@ data:
       },
       "sync_worker_config": {
         "enabled": $KSBX_SYNC_ENABLED,
+        "_group_key_ttl": 10,
         "hash_keys": false
       }
     }
