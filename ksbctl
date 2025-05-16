@@ -33,7 +33,7 @@ if [[ -z $KSBCTL_CLUSTER ]]; then
 else
   CLUSTER=$KSBCTL_CLUSTER
 fi
-alias kubectl="kubectl --cluster=$CLUSTER"
+alias kubectl="minikube kubectl -- --cluster=$CLUSTER"
 alias helm="helm --kube-context $CLUSTER"
 
 SCRIPTNAME=$0
