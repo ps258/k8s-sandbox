@@ -15,7 +15,7 @@ data:
         "enable_detailed_recording": true
       },
       "app_path": "/opt/tyk-gateway/apps/",
-      "bundle_base_url": "http://$KSBX_LOCAL_IP:8000",
+      "bundle_base_url": "http://bastion:8000/$KSBX_GATE_PLUGIN_DIR/",
       "close_connections": false,
       "close_idle_connections": false,
       "control_api_hostname": "",

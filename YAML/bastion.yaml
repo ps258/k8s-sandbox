@@ -31,5 +31,12 @@ spec:
           runAsNonRoot: false
           allowPrivilegeEscalation: true
           privileged: true
-        command: ["/usr/bin/sleep", "infinity"]
+        command: ["/setup/entrypoint.sh"]
         workingDir: /
+        volumeMounts:
+          - name: plugins
+            mountPath: /opt/tyk-plugins
+      volumes:
+        - name: plugins
+          hostPath:
+            path: /plugins

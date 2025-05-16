@@ -58,6 +58,7 @@ ENABLE_HTTPS=false
 ENABLE_ISTIO=false
 sandboxVersion=''
 KSBX_GATE_VERS=''
+KSBX_GATE_PLUGIN_DIR=''
 KSBX_GATE_EE=''
 KSBX_DASH_VERS=''
 KSBX_PUMP_VERS=''
@@ -792,6 +793,7 @@ function loadVersions {
   line=$1
   IFS=,
   echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers MDCBvers EDPvers
+  export KSBX_GATE_PLUGIN_DIR="$gwVers"
   export KSBX_GATE_VERS="v${gwVers%%-1}"
   if echo $KSBX_GATE_VERS | grep -q ee; then
     export KSBX_GATE_EE='-ee'
@@ -1315,7 +1317,7 @@ if [[ $# -gt 0 ]]; then
             waitDeploymentReady postgres-db
           fi
           echo "[INFO]Deploying httpbin and a bastion container"
-          applyYAMLtemplate httpbin-deployment.yaml httpbin-svc-control.yaml bastion.yaml
+          applyYAMLtemplate httpbin-deployment.yaml httpbin-svc-control.yaml bastion.yaml bastion-svc.yaml
           echo "[INFO]Starting dashboard, pump and gateway"
           # setup configmaps first
           applyYAMLtemplate tyk-gateway-configmap-control.yaml

@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: bastion
+  labels:
+    app: bastion
+    plane: control
+spec:
+  ports:
+    - port: 8000
+      protocol: TCP
+      targetPort: 8000
+  type: NodePort
+  selector:
+    app: bastion
+    plane: control
