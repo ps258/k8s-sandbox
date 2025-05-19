@@ -250,12 +250,10 @@ function checkCommandInstalled {
 function checkMongoShellInstalled {
   if [[ -z $MONGOSHELL ]]; then
     if ! which mongo >/dev/null; then
-      if which mongosh > /dev/null; then
-        alias mongo=mongosh
-        MONGOSHELL=mongosh
-      else
-        echo "[FATAL]Mongo shell 'mongo' or 'mongosh' not installed. Cannot continue"
-        exit 1
+      alias mongo=mongosh
+      MONGOSHELL=mongosh
+      if ! which mongosh > /dev/null; then
+        echo "[WARN]Mongo shell 'mongo' and 'mongosh' are not installed. Will not be able to mongo data"
       fi
     else
       MONGOSHELL=mongo
@@ -279,8 +277,7 @@ function getMinikubeIP {
 function setGlobals {
   checkCommandInstalled jq envsubst yq
   if which minikube > /dev/null 2>&1 ; then
-    #alias kubectl="minikube kubectl -- "
-    # check for command dependencies
+    # Get the minikube IP address
     IP=$(getMinikubeIP)
   else
     # Fall back to the local IP address
@@ -794,6 +791,9 @@ function loadVersions {
   IFS=,
   echo "$line" | read version gwVers dshbVers pumpVers TIBvers syncVers MDCBvers EDPvers
   export KSBX_GATE_PLUGIN_DIR="$gwVers"
+  if [[ ! -d $HOME/.tyk/plugins/$KSBX_GATE_PLUGIN_DIR ]]; then
+    mkdir -p $HOME/.tyk/plugins/$KSBX_GATE_PLUGIN_DIR
+  fi
   export KSBX_GATE_VERS="v${gwVers%%-1}"
   if echo $KSBX_GATE_VERS | grep -q ee; then
     export KSBX_GATE_EE='-ee'
