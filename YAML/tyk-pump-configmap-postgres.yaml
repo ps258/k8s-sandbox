@@ -21,6 +21,7 @@ data:
         "optimisation_max_active": 10,
         "enable_cluster": false
       },
+      "enable_http_profiler", true,
       "purge_delay": 2,
       "pumps": {
         "sql": {

@@ -35,7 +35,7 @@ spec:
         env:
           - name: TYK_LOGLEVEL
             value: "${KSBX_LOG_LEVEL}"              
-        command: ["/opt/tyk-dashboard/tyk-analytics", "--conf=/etc/tyk-dashboard/tyk_analytics.conf"]
+        command: ["/opt/tyk-dashboard/tyk-analytics", "--conf=/etc/tyk-dashboard/tyk_analytics.conf", "--pprof"]
         workingDir: /opt/tyk-dashboard
         ports:
         - containerPort: 3000

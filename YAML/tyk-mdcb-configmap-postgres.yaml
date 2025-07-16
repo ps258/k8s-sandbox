@@ -13,6 +13,7 @@ data:
         "type": "postgres",
         "connection_string": "user=${KSBX_PGUSER} password=${KSBX_PGPASSWORD} database=${KSBX_PGDB} host=postgres-db port=5432"
       },
+      "enable_http_profiler", true,
       "forward_analytics_to_pump": true,
       "hash_keys": false,
       "healthcheck_port": 8181,
