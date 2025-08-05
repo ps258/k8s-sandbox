@@ -12,7 +12,7 @@ data:
       "analytics": {
         "mongo_url": "mongodb://mongo-db/tyk_analytics"
       },
-      "enable_http_profiler", true,
+      "enable_http_profiler": true,
       "forward_analytics_to_pump": true,
       "hash_keys": false,
       "healthcheck_port": 8181,
