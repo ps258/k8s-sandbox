@@ -22,7 +22,7 @@ spec:
             claimName: ${KSBX_NS}-mongo-pvc
       containers:
       - name: master
-        image: mongo:4.4.29
+        image: mongo:5.0.31
         ports:
         - containerPort: 27017
         volumeMounts:
