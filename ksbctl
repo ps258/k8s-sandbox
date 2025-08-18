@@ -935,7 +935,7 @@ EOF
 # Sometimes PersistentVolumeClaim are left when the namespace is deleted.
 # Tidy up any in state 'Released'
 # This happens most when minikube is stopped and restarted
-function tidyPVCs {
+function tidyReleasedPVCs {
   typeset pvc
   for pvc in $(kubectl get pv --no-headers=true 2>/dev/null | awk '$5=="Released" {print $1}'); do
     echo "[INFO]kubectl delete pv $pvc"
@@ -1446,9 +1446,12 @@ if [[ $# -gt 0 ]]; then
           kubectl delete namespace $NAMESPACE --wait
         fi
       done
-      tidyPVCs
-      # minikube doesn't always remove the PVs properly. Lets get rid of them properly
-      minikube -p $CLUSTER ssh -- "test -d /var/hostpath-provisioner/$NAMESPACE/ && sudo rm -rf /var/hostpath-provisioner/$NAMESPACE/" 2>/dev/null
+      tidyReleasedPVCs
+      for NAMESPACE in $(getNamespaceNames $*); do
+        # minikube doesn't always remove the PVs properly. Lets get rid of them properly
+        #echo "minikube -p $CLUSTER ssh -- \"test -d /var/hostpath-provisioner/$NAMESPACE/ && sudo rm -rf /var/hostpath-provisioner/$NAMESPACE/\""
+        minikube -p $CLUSTER ssh -- "test -d /var/hostpath-provisioner/$NAMESPACE/ && sudo rm -rf /var/hostpath-provisioner/$NAMESPACE/" 2>/dev/null
+      done
       ;;
 
     help)
