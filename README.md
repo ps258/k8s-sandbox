@@ -75,7 +75,7 @@
           operator: install the latest version of operator ready for contexts in sandbox namespaces
           istio: (NOT YET IMPLEMENTED) setup istio so that it's possible to monitor and configure the sandbox networks
     ksbctl shell <sandbox namespace> <podname>
-          Start an interactive shell in the pod.
+          Start an interactive shell in the pod. Not much use with distroless pods
           The pod name can be a substring of the actual name
           eg. ksbctl shell ksandbox-1 dashboard
     ksbctl start
