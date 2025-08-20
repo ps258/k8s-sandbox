@@ -73,7 +73,7 @@
           Publish the API in api.json into the sandbox
     ksbctl setup <operator|istio>
           operator: install the latest version of operator ready for contexts in sandbox namespaces
-          istio: setup istio so that it's possible to monitor and configure the sandbox networks
+          istio: (NOT YET IMPLEMENTED) setup istio so that it's possible to monitor and configure the sandbox networks
     ksbctl shell <sandbox namespace> <podname>
           Start an interactive shell in the pod.
           The pod name can be a substring of the actual name
