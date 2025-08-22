@@ -108,6 +108,7 @@ function help {
   echo "      -i Add the istio label to the namespace so istio is injected into the pods"
   echo "      -l set the log level of the containers (debug, info, warning or error)"
   echo "      -m Run MDCB and configure edge gateways"
+  echo "      -M A file to read environment variables from and add them the data plane gateways"
   echo "      -N Use the given namespace name rather than the next available sandbox"
   echo "         Useful when there's a need to import apis and policy YAML with set namespace"
   echo "      -n Don't use '$ENVFILE' to bootstrap the install"
@@ -687,7 +688,7 @@ function applyYAMLtemplate {
       cat $YAMLDIR/$YAMLfile | envsubst > $tmpYamlFile
       if [[ -n $ENV_VAR_FILE ]]; then
         if grep -qw 'kind: Deployment' $tmpYamlFile; then
-          addEnvVars $tmpYamlFile
+          addGlobalEnvVars $tmpYamlFile
         fi
       fi
       kubectl apply -n $NAMESPACE -f $tmpYamlFile
@@ -696,13 +697,15 @@ function applyYAMLtemplate {
   done
 }
 
-function addEnvVars {
+function addGlobalEnvVars {
   typeset YAMLfile
-  typeset VAR
-  typeset VALUE
-  typeset line
   YAMLfile=$1
   yq eval '(.spec.template.spec.containers[0].envFrom) += [{"configMapRef": {"name": "sandbox-env-vars"}}]' -i $YAMLfile
+}
+
+function addDataplaneEnvVars {
+  kubectl create configmap edge-gateway-env-vars --from-env-file="$DATAPLANE_ENV_VAR_FILE" -n $NAMESPACE
+  kubectl get deploy edge-gateway -n $NAMESPACE -o yaml | yq eval '(.spec.template.spec.containers[0].envFrom) += [{"configMapRef": {"name": "edge-gateway-env-vars"}}]' | kubectl apply -f -
 }
 
 function getPodNames {
@@ -1104,7 +1107,7 @@ if [[ $# -gt 0 ]]; then
 
     create)
       shift
-      while getopts :c:D:de:E:hH:il:mN:nopR:sSt:v: arg; do
+      while getopts :c:D:de:E:hH:il:M:mN:nopR:sSt:v: arg; do
         case $arg in
           c)
             # the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -1120,7 +1123,7 @@ if [[ $# -gt 0 ]]; then
             PUBLISH_APIS=false
             ;;
           E)
-            # environment variable file
+            # global environment variable file
             ENV_VAR_FILE=$OPTARG
             if [[ ! -f $ENV_VAR_FILE ]]; then
               echo "[FATAL]Cannot read environment variable file: '$ENV_VAR_FILE'"
@@ -1164,6 +1167,14 @@ if [[ $# -gt 0 ]]; then
               KSBX_LOG_LEVEL=$OPTARG
             else
               echo "[FATAL]Loglevel must be one of debug, info, warnding or error"
+              exit 1
+            fi
+            ;;
+          M)
+            # set custom environment vars from the file for the data plane gateways
+            DATAPLANE_ENV_VAR_FILE=$OPTARG
+            if [[ ! -f $DATAPLANE_ENV_VAR_FILE ]]; then
+              echo "[FATAL]Cannot read environment variable file: '$DATAPLANE_ENV_VAR_FILE'"
               exit 1
             fi
             ;;
@@ -1353,6 +1364,9 @@ if [[ $# -gt 0 ]]; then
             waitDeploymentReady tyk-sink
             # deploy edge gateway(s)
             applyYAMLtemplate tyk-gateway-deployment-edge.yaml
+            if [[ -n $DATAPLANE_ENV_VAR_FILE ]]; then
+              addDataplaneEnvVars
+            fi
             if [[ $ENABLE_HTTPS == 'true' ]]; then
               enableEdgeHttps
             fi
