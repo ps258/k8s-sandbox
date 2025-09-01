@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tyk-portal-conf
+  labels:
+    app: tyk-portal
+data:
+  portal.conf: |-
+    {
+      "Blog": {
+        "Enable": true
+      },
+      "Forms": {
+        "Enable": true
+      },
+      "HostPort": 3001,
+      "LicenseKey": "${SBX_LICENSE}",
+      "PortalAPISecret": "123456",
+      "S3": {
+        "ACL": "",
+        "AccessKey": "your-access-key-here",
+        "Bucket": "your-bucket-here",
+        "Endpoint": "if-any",
+        "PresignURLs": true,
+        "Region": "s3-region",
+        "SecretKey": "your-secret-key-here"
+      },
+      "Site": {
+        "Enable": true
+      },
+      "TLSConfig": {
+        "Certificates": [
+          {
+            "CertFile": "portal.crt",
+            "KeyFile": "portal.key",
+            "Name": "localhost"
+          }
+        ],
+        "Enable": false,
+        "InsecureSkipVerify": false
+      }
+    }
+

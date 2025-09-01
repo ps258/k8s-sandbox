@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tyk-portal
+  labels:
+    app: tyk-portal
+    plane: control
+spec:
+  replicas: 1
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: tyk-portal
+      plane: control
+  template:
+    metadata:
+      labels:
+        app: tyk-portal
+        plane: control
+      annotations:
+    spec:
+      containers:
+      - image: tykio/portal:$KSBX_EDP_VERS
+        imagePullPolicy: IfNotPresent
+        name: tyk-portal
+        securityContext:
+          runAsNonRoot: false
+          allowPrivilegeEscalation: true
+          privileged: true
+        env:
+          - name: TYK_PORTAL_LOGLEVEL
+            value: "${KSBX_LOG_LEVEL}"
+          - name: PORTAL_DATABASE_DIALECT
+            value: "postgres"
+          - name: PORTAL_DATABASE_ENABLELOGS
+            value: "false"
+          - name: PORTAL_THEMING_THEME
+            value: "default"
+          - name: PORTAL_LICENSEKEY
+            value: "${SBX_LICENSE}"
+          - name: PORTAL_HOSTPORT
+            value: "3001"
+          - name: PORTAL_DATABASE_CONNECTIONSTRING
+            value: "user=${KSBX_PGUSER} password=${KSBX_PGPASSWORD} database=${KSBX_PGDB} host=postgres-db port=5432"
+        command: ["/opt/portal/dev-portal", "--conf=/etc/tyk-portal/portal.conf"]
+        workingDir: /opt/portal
+        ports:
+        - containerPort: 3001
+        volumeMounts:
+          - name: tyk-portal-conf
+            mountPath: /etc/tyk-portal
+        livenessProbe:
+          httpGet:
+            scheme: "HTTP"
+            path: /
+            port: 3001
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        readinessProbe:
+          httpGet:
+            scheme: "HTTP"
+            path: /
+            port: 3001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+        - name: tyk-portal-conf
+          configMap:
+            name: tyk-portal-conf
+            items:
+              - key: portal.conf
+                path: portal.conf
