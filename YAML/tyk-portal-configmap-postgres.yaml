@@ -28,6 +28,7 @@ data:
       "Site": {
         "Enable": true
       },
+      "DisableCSRFCheck": true,
       "TLSConfig": {
         "Certificates": [
           {
