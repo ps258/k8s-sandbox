@@ -56,6 +56,7 @@ KSBX_TYPE=pro
 INSTALL_EDGE=false
 ENABLE_HTTPS=false
 ENABLE_ISTIO=false
+ENABLE_EDP=false
 sandboxVersion=''
 KSBX_GATE_VERS=''
 KSBX_GATE_PLUGIN_DIR=''
@@ -104,7 +105,7 @@ function help {
   echo "      -e The number of edge gateway replicas to run"
   echo "      -E A file to read environment variables from and add them all deployments"
   echo "      -H Setup hybrid install. Provide the control plane k-sandbox here"
-  echo "      -h Setup the edge gateways to use https (implies -m and incompatible with -i)"
+  echo "      -h Setup the edge gateways to use https. (Implies -m and incompatible with -i)"
   echo "      -i Add the istio label to the namespace so istio is injected into the pods"
   echo "      -l set the log level of the containers (debug, info, warning or error)"
   echo "      -m Run MDCB and configure edge gateways"
@@ -114,6 +115,7 @@ function help {
   echo "      -n Don't use '$ENVFILE' to bootstrap the install"
   echo "      -o Create OperatorContext for Tyk Operator"
   echo "      -p Deploy with postgres not mongo"
+  echo "      -P Deploy with EDP. (Implies -p)"
   echo "      -s Deploy a stand alone gateway"
   echo "      -S Enable the MDCB synchroniser"
   echo "      -R The size of the allocated redis control or data plane storage in GiB (default: $KSBX_REDIS_DB_SIZE)"
@@ -521,6 +523,10 @@ function getStandaloneGatewayPort {
   kubectl get svc -n $NAMESPACE standalone-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
 
+function getPortalPort {
+  kubectl get svc -n $NAMESPACE tyk-portal --no-headers=true | awk -F '[:/ ]+' '{print $6}'
+}
+
 function getHybridGatewayPort {
   kubectl get svc -n $NAMESPACE hybrid-gateway --no-headers=true | awk -F '[:/ ]+' '{print $6}'
 }
@@ -531,6 +537,9 @@ function reportSanboxInfo {
   if [[ $KSBX_TYPE == 'pro'  || $KSBX_TYPE == 'mdcb' ]]; then
     echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
     echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
+    if [[ $KSBX_HAS_EDP != "null" ]]; then
+      echo "$NAMESPACE.portal:            http://$IP:$(getPortalPort)/"
+    fi
     if [[ $KSBX_TYPE == "mdcb" ]]; then
       echo "$NAMESPACE.MDCBport:          $IP:$(getMDCBPort)"
       https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
@@ -598,6 +607,9 @@ function createNamespace {
     fi
     if [[ -n $KSBX_MDCB_VERS ]]; then
       echo "  KSBX_MDCB: $KSBX_MDCB_VERS" >> $configYAML
+    fi
+    if [[ -n $KSBX_EDP_VERS ]]; then
+      echo "  KSBX_EDP: $KSBX_EDP_VERS" >> $configYAML
     fi
     echo "  KSBX_TYPE: $KSBX_TYPE" >> $configYAML
     if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
@@ -677,6 +689,7 @@ function OperatorContextExists {
 # KSBX_DASH_VERS which has the dashboard version. This is used to pull the dashboard docker image
 # KSBX_PUMP_VERS which has the pump version. This is used to pull the pump docker image
 # KSBX_MDCB_VERS which has the MDCB version. This is used to pull the MDCB docker image
+# KSBX_EDP_VERS which has the EDP version. This is used to pull the EDP docker image
 # KSBX_NS which is the namespace for the pods etc.
 function applyYAMLtemplate {
   typeset YAMLfile
@@ -714,7 +727,7 @@ function getPodNames {
   kubectl get pods -n $NAMESPACE | awk '/'$podname'/ {print $1}' | xargs
 }
 
-# bootstrap the dashboard and add the admin user
+# Bootstrap the dashboard with the licence and add the admin user
 # This replaces licenseDashboard and addDashboardUser
 function bootstrapPro {
   if [[ -n $SBX_LICENSE && -n $SBX_USER && -n $SBX_PASSWORD ]]; then
@@ -723,7 +736,8 @@ function bootstrapPro {
   fi
 }
 
-# apply the licence to the dashboard
+# Apply the licence to the dashboard
+# Replaced by bootstrapPro
 function licenseDashboard {
   if [[ -n $SBX_LICENSE ]]; then
     echo "[INFO]Licensing the dashboard"
@@ -731,7 +745,8 @@ function licenseDashboard {
   fi
 }
 
-# add the user and set their password
+# Add the user and set their password
+# Replaced by bootstrapPro
 function addDashboardUser {
   if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
     SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
@@ -761,6 +776,7 @@ function getDatabaseType {
 # is this a pro install or standalone
 function getInstallType {
   KSBX_TYPE=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_TYPE)
+  KSBX_HAS_EDP=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_EDP)
 }
 
 # report the tyk versions saved in the namespace configmap sandbox-details when it was created
@@ -768,7 +784,7 @@ function showTykVersions {
   typeset key; typeset value; typeset report; typeset sandboxDetails; typeset description
   sandboxDetails=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data)
   report=''
-  for key in KSBX_DATABASE KSBX_MDCB KSBX_PMP KSBX_GW KSBX_DB KSBX_TYPE KSBX_VERSION; do
+  for key in KSBX_DATABASE KSBX_MDCB KSBX_PMP KSBX_GW KSBX_DB KSBX_TYPE KSBX_VERSION KSBX_EDP; do
     value=$(echo $sandboxDetails | jq -r .$key)
     if [[ $value != 'null' ]]; then
       report="$report $key=$value"
@@ -808,6 +824,9 @@ function loadVersions {
   if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
     export KSBX_DASH_VERS="v${dshbVers%%-1}"
     export KSBX_PUMP_VERS="v${pumpVers%%-1}"
+    if [[ $ENABLE_EDP == "true" ]]; then
+      export KSBX_EDP_VERS="v${EDPvers%%-1}"
+    fi
     if [[ $KSBX_TYPE == 'mdcb' ]]; then
       export KSBX_MDCB_VERS="v${MDCBvers%%-1}"
     fi
@@ -1107,7 +1126,7 @@ if [[ $# -gt 0 ]]; then
 
     create)
       shift
-      while getopts :c:D:de:E:hH:il:M:mN:nopR:sSt:v: arg; do
+      while getopts :c:D:de:E:hH:il:M:mN:nopPR:sSt:v: arg; do
         case $arg in
           c)
             # the number of control gateways to deploy (these are also just gateways in the pro install)
@@ -1204,6 +1223,11 @@ if [[ $# -gt 0 ]]; then
             # defaults to mongo without this
             KSBX_DATABASE=postgres
             ;;
+          P)
+            # deploy EDP must deploy PG as well then
+            KSBX_DATABASE=postgres
+            ENABLE_EDP=true
+            ;;
           R)
             # The size of the allocated control and data plane redis storage in GiB
             KSBX_REDIS_DB_SIZE=$(echo $OPTARG | tr -cd 0-9)
@@ -1298,10 +1322,12 @@ if [[ $# -gt 0 ]]; then
             loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1)
             echo -n "[INFO]Using Gateway $KSBX_GATE_VERS, Dashboard $KSBX_DASH_VERS, Pump $KSBX_PUMP_VERS"
             if [[ -n $KSBX_MDCB_VERS ]]; then
-              echo ", MDCB $KSBX_MDCB_VERS"
-            else
-              echo 
+              echo -n ", MDCB $KSBX_MDCB_VERS"
             fi
+            if [[ -n $KSBX_EDP_VERS ]]; then
+              echo -n ", EDP $KSBX_EDP_VERS"
+            fi
+            echo 
           else
             echo "[FATAL]Unable to find '$sandboxVersion' in '$VERSIONFILE'"
             exit 1
@@ -1344,8 +1370,12 @@ if [[ $# -gt 0 ]]; then
           waitDeploymentReady tyk-dashboard
           waitDeploymentReady control-gateway
           bootstrapPro
-          #licenseDashboard
-          #addDashboardUser
+          if [[ $ENABLE_EDP == 'true' ]]; then
+            applyYAMLtemplate tyk-portal-configmap-postgres.yaml
+            applyYAMLtemplate tyk-portal-deployment.yaml
+            applyYAMLtemplate tyk-portal-svc.yaml
+            waitDeploymentReady tyk-portal
+          fi
           if [[ $KSBX_TYPE == 'mdcb' ]]; then
             # add edge redis and edge gateways
             export KSBX_ADMIN_API_KEY=$(getAdminUserKey)
