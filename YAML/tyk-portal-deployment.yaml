@@ -33,7 +33,7 @@ spec:
           allowPrivilegeEscalation: true
           privileged: true
         env:
-          - name: TYK_PORTAL_LOGLEVEL
+          - name: PORTAL_LOG_LEVEL
             value: "${KSBX_LOG_LEVEL}"
           - name: PORTAL_DATABASE_DIALECT
             value: "postgres"

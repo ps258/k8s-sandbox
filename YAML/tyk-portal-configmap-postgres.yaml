@@ -13,32 +13,14 @@ data:
       "Forms": {
         "Enable": true
       },
-      "HostPort": 3001,
-      "LogLevel": "{$KSBX_LOG_LEVEL}",
-      "PortalAPISecret": "123456",
-      "S3": {
-        "ACL": "",
-        "AccessKey": "your-access-key-here",
-        "Bucket": "your-bucket-here",
-        "Endpoint": "if-any",
-        "PresignURLs": true,
-        "Region": "s3-region",
-        "SecretKey": "your-secret-key-here"
-      },
       "Site": {
         "Enable": true
       },
+      "HostPort": 3001,
+      "PortalAPISecret": "123456",
       "DisableCSRFCheck": true,
       "TLSConfig": {
-        "Certificates": [
-          {
-            "CertFile": "portal.crt",
-            "KeyFile": "portal.key",
-            "Name": "localhost"
-          }
-        ],
-        "Enable": false,
-        "InsecureSkipVerify": false
+        "InsecureSkipVerify": true
       }
     }
 
