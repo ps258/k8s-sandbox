@@ -33,6 +33,8 @@ spec:
           allowPrivilegeEscalation: true
           privileged: true
         env:
+          - name: PORTAL_DISABLE_CSRF_CHECK
+            value: "true"
           - name: PORTAL_LOG_LEVEL
             value: "${KSBX_LOG_LEVEL}"
           - name: PORTAL_DATABASE_DIALECT

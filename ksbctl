@@ -1371,7 +1371,6 @@ if [[ $# -gt 0 ]]; then
           waitDeploymentReady control-gateway
           bootstrapPro
           if [[ $ENABLE_EDP == 'true' ]]; then
-            applyYAMLtemplate tyk-portal-configmap-postgres.yaml
             applyYAMLtemplate tyk-portal-deployment.yaml
             applyYAMLtemplate tyk-portal-svc.yaml
             waitDeploymentReady tyk-portal
