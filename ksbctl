@@ -536,10 +536,10 @@ function reportSanboxInfo {
   echo "$NAMESPACE.Description:       $(getDescription)"
   if [[ $KSBX_TYPE == 'pro'  || $KSBX_TYPE == 'mdcb' ]]; then
     echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
-    echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
     if [[ $KSBX_HAS_EDP != "null" ]]; then
       echo "$NAMESPACE.portal:            http://$IP:$(getPortalPort)/"
     fi
+    echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
     if [[ $KSBX_TYPE == "mdcb" ]]; then
       echo "$NAMESPACE.MDCBport:          $IP:$(getMDCBPort)"
       https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
@@ -1414,6 +1414,7 @@ if [[ $# -gt 0 ]]; then
             fi
           fi
           listPods
+          getInstallType
           reportSanboxInfo 
         elif [[ $KSBX_TYPE == 'standalone' ]]; then
           # create standalone (CE) deployment of the gateway
