@@ -732,7 +732,6 @@ function getPodNames {
 # This replaces licenseDashboard and addDashboardUser
 function bootstrapPro {
   if [[ -n $SBX_LICENSE && -n $SBX_USER && -n $SBX_PASSWORD ]]; then
-    SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
     kubectl exec $(getPodNames bastion) -n $NAMESPACE -- /tyk-scripts/python/bootstrap.py --dashboard $INT_DSHB_URL --adminSecret $KSBX_ADMIN_SECRET --licence $SBX_LICENSE --adminEmail $SBX_USER --adminPassword $SBX_CLEAR_PASSWORD
   fi
 }
@@ -750,7 +749,6 @@ function licenseDashboard {
 # Replaced by bootstrapPro
 function addDashboardUser {
   if [[ -n $SBX_USER && -n $SBX_PASSWORD ]]; then
-    SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
     # this bootstrap method is reliable for versions 2.9.x - 3.2.x (won't work on 2.8.x or earlier)
     echo "[INFO]Adding admin account $SBX_USER"
     curl -s -d "email_address=$SBX_USER&first_name=Tyk&last_name=Admin&password=$SBX_CLEAR_PASSWORD&confirm_password=$SBX_CLEAR_PASSWORD" http://$IP:$(getDashboardPort)/bootstrap > /dev/null
@@ -1265,6 +1263,7 @@ if [[ $# -gt 0 ]]; then
       if [[ $BOOTSTRAP == 'true' && -f $ENVFILE ]]; then
         # load env variables
         . $ENVFILE
+        SBX_CLEAR_PASSWORD=$(echo $SBX_PASSWORD | base64 -d)
         if [[ -n $SBX_HOST_IP_ADDR ]]; then
           KSBX_LOCAL_IP=$SBX_HOST_IP_ADDR
         fi
@@ -1372,6 +1371,11 @@ if [[ $# -gt 0 ]]; then
           waitDeploymentReady control-gateway
           bootstrapPro
           if [[ $ENABLE_EDP == 'true' ]]; then
+            if [[ $BOOTSTRAP == 'true' ]]; then
+              export KSBC_PORTAL_COMMAND_ARGS='"-bootstrap", "-first=Tyk", "-last=Admin", "-user='$SBX_USER'", "-pass='$SBX_CLEAR_PASSWORD'", "--conf=/opt/portal/portal.conf"'
+            else
+              export KSBC_PORTAL_COMMAND_ARGS='"--conf=/opt/portal/portal.conf"'
+            fi
             applyYAMLtemplate tyk-portal-PersistentVolumeClaim.yaml tyk-portal-deployment.yaml
             applyYAMLtemplate tyk-portal-svc.yaml
             waitDeploymentReady tyk-portal
