@@ -79,6 +79,7 @@ export KSBX_LOG_LEVEL=debug       # the default log level
 export KSBX_SYNC_ENABLED=false    # enable the MDCB synchroniser
 export KSBX_REDIS_DB_SIZE=1       # the size to make the redis persistent volume claim for both control plane and edge deployment
 export KSBX_PG_MNGO_DB_SIZE=5     # the size to make the mongo or postgresql DB persistent volume claim
+export KSBX_PG_PORTAL_THEMES_SIZE=2     # the size to make EDP's /opt/portal/themes volume for storing themes
 # KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s (Overridden by SBX_HOST_IP_ADDR if it's defined)
 export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}' | sort -n | head -1)
 KSBX_CONTROL_PLANE=''
@@ -1371,7 +1372,7 @@ if [[ $# -gt 0 ]]; then
           waitDeploymentReady control-gateway
           bootstrapPro
           if [[ $ENABLE_EDP == 'true' ]]; then
-            applyYAMLtemplate tyk-portal-deployment.yaml
+            applyYAMLtemplate tyk-portal-PersistentVolumeClaim.yaml tyk-portal-deployment.yaml
             applyYAMLtemplate tyk-portal-svc.yaml
             waitDeploymentReady tyk-portal
           fi

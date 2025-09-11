@@ -24,6 +24,14 @@ spec:
         plane: control
       annotations:
     spec:
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      volumes:
+        - name: tyk-portal-themes-vol
+          persistentVolumeClaim:
+            claimName: ${KSBX_NS}-tyk-portal-pvc
       containers:
       - image: tykio/portal:$KSBX_EDP_VERS
         imagePullPolicy: IfNotPresent
@@ -49,13 +57,10 @@ spec:
             value: "3001"
           - name: PORTAL_DATABASE_CONNECTIONSTRING
             value: "user=${KSBX_PGUSER} password=${KSBX_PGPASSWORD} database=${KSBX_PGDB} host=postgres-db port=5432"
-        command: ["/opt/portal/dev-portal", "--conf=/etc/tyk-portal/portal.conf"]
+        command: ["/opt/portal/dev-portal", "--conf=/opt/portal/portal.conf"]
         workingDir: /opt/portal
         ports:
         - containerPort: 3001
-        volumeMounts:
-          - name: tyk-portal-conf
-            mountPath: /etc/tyk-portal
         livenessProbe:
           httpGet:
             scheme: "HTTP"
@@ -74,10 +79,6 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 3
           failureThreshold: 3
-      volumes:
-        - name: tyk-portal-conf
-          configMap:
-            name: tyk-portal-conf
-            items:
-              - key: portal.conf
-                path: portal.conf
+        volumeMounts:
+          - mountPath: /opt/portal/themes
+            name: tyk-portal-themes-vol

@@ -1,0 +1,13 @@
+apiVersion: v1 
+kind: PersistentVolumeClaim
+metadata:
+  name: ${KSBX_NS}-tyk-portal-pvc
+  labels:
+    app: tyk-portal
+    plane: control
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: ${KSBX_PG_PORTAL_THEMES_SIZE}Gi
