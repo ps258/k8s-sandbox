@@ -572,7 +572,7 @@ function reportSanboxInfo {
       echo "$NAMESPACE.MDCBport:          $display_IP:$mdcb_port"
       https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
       edge_gateway_port=$(getEdgeGatewayPort)
-      ssh_edge_gateway="-L localhost:$edge_gateway_port:$display_IP:$edge_gateway_port"
+      ssh_edge_gateway="-L localhost:$edge_gateway_port:$IP:$edge_gateway_port"
       if [[ $https == 'true' ]]; then
         echo "$NAMESPACE.edge-gateway:      https://$display_IP:$edge_gateway_port/"
       else
