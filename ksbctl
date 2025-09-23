@@ -619,7 +619,7 @@ function reportSanboxInfo {
   fi
   if [[ $(cat /sys/devices/virtual/dmi/id/board_vendor) == "Amazon EC2" ]]; then
     # report the ssh command to map the service ports back to localhost
-    echo "$NAMESPACE.ssh                ssh $ssh_dashboard $ssh_edp $ssh_control_gateway $ssh_mdcb $ssh_edge_gateway $ssh_mongodb $ssh_postgres $ssh_control_redis $ssh_edge_redis $ssh_standalone_gateway $ssh_hybrid_gateway $ssh_hybrid_redis <aws hostname>"
+    echo "$NAMESPACE.ssh                $(echo ssh $ssh_dashboard $ssh_edp $ssh_control_gateway $ssh_mdcb $ssh_edge_gateway $ssh_mongodb $ssh_postgres $ssh_control_redis $ssh_edge_redis $ssh_standalone_gateway $ssh_hybrid_gateway $ssh_hybrid_redis) <aws hostname>"
   fi
 
   # if the namespace has the label 'istio-injection=enabled' then report the istio-system services
