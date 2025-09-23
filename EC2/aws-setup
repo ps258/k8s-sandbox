@@ -1,0 +1,51 @@
+#!/bin/bash -x
+
+PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
+
+if [[ $# < 1 ]]; then
+  echo "[FATAL]Must specify hostname or alias"
+  exit 1
+fi
+
+SCRIPTNAME=$0
+SCRIPTDIR=$(
+  cd "$(dirname $SCRIPTNAME)"
+  echo $PWD
+)
+
+AWS=$1
+
+
+# copy stuff out of ~/.ssh
+for file in ~/.ssh/tyk-github_ed25519 ~/.ssh/config; do
+  if [[ -r $file ]]; then
+    scp $file $AWS:.ssh
+  fi
+done
+
+# copy other handy files
+for file in ~/.tyk-sandbox ~/.curlrc ~/.vimrc ~/.screenrc; do
+  if [[ -r $file ]]; then
+    scp $file $AWS:
+  fi
+done
+
+# copy directories
+for dir in ~/.vim; do
+  if [[ -d $dir ]]; then
+    scp -r $dir $AWS:
+  fi
+done
+
+#scp ~/.ssh/tyk-github_ed25519 $AWS:.ssh
+#scp ~/.ssh/config $AWS:.ssh
+#scp ~/.tyk-sandbox $AWS:
+#scp ~/.curlrc $AWS:
+#scp ~/.vimrc $AWS:
+#scp ~/.screenrc $AWS:
+#scp -r ~/.vim $AWS:
+
+# copy over the working script and run it twice
+scp $SCRIPTDIR/ubuntu-deploy-sandboxes $AWS:
+ssh $AWS ./ubuntu-deploy-sandboxes
+ssh $AWS ./ubuntu-deploy-sandboxes

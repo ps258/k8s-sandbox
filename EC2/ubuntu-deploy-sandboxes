@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# commands to setup a host so that it can run sandboxes
+
+if [[ ! -d code ]]; then
+  # create subdir and clone repos
+  mkdir code
+  cd code
+  ssh-keyscan github.com >> ~/.ssh/known_hosts
+  chmod 600 ~/.ssh/known_hosts
+  git clone git@github.com:ps258/tyk-sandbox.git
+  git clone git@github.com:ps258/tyk-scripts.git
+  git clone git@github.com:ps258/k8s-sandbox.git
+  cd ~
+
+  # install packages
+  sudo apt-get update
+  sudo apt-get install -y ca-certificates curl
+  sudo apt-get install -y python3-packaging
+  sudo apt-get install -y hey
+  sudo apt-get install -y net-tools
+  sudo apt-get install -y jq
+  sudo apt-get install -y ksh
+
+  # redis and mongo client tools
+  sudo apt-get install -y redis-tools
+  wget -qO- https://www.mongodb.org/static/pgp/server-8.0.asc | sudo tee /etc/apt/trusted.gpg.d/server-8.0.asc
+  sudo apt-get install -y gnupg
+  echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+  sudo apt-get -y update
+  sudo apt-get install -y mongodb-mongosh
+
+  # install yq and minikube
+  if [[ $(uname -p) == 'x86_64' ]]; then
+    # x86
+    # yq
+    wget https://github.com/mikefarah/yq/releases/download/v4.46.1/yq_linux_amd64
+    sudo install yq_linux_amd64 /usr/local/bin/yq && rm yq_linux_amd64
+    # minikube
+    curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
+    sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+  else
+    # arm
+    # yq
+    wget https://github.com/mikefarah/yq/releases/download/v4.46.1/yq_linux_arm64
+    sudo install yq_linux_arm64 /usr/local/bin/yq && rm yq_linux_arm64
+    # minikube
+    curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-arm64
+    sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-arm64
+  fi
+
+  # install docker
+  sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  sudo apt-get update
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  sudo usermod -aG docker $USER
+
+  echo 'PATH=$PATH:$HOME/code/tyk-sandbox:$HOME/code/k8s-sandbox:$HOME/code/tyk-sandbox/scripts:$HOME/code/tyk-scripts/python' >> ~/.bashrc
+  echo 'alias k="minikube kubectl -- "' >> ~/.bashrc
+  echo "alias ks=ksbctl" >> ~/.bashrc
+  echo "alias ds=dsbctl" >> ~/.bashrc
+  echo $(hostname -i) httpbin.org | sudo tee -a /etc/hosts
+else
+  # already done most of the setup
+  # for tyk-sandbox we need a local httpbin. This works on ARM64
+  docker run -d --restart unless-stopped -p 80:8080 mccutchen/go-httpbin
+fi
