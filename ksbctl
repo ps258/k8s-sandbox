@@ -612,10 +612,10 @@ function reportSanboxInfo {
   elif [[ $KSBX_TYPE == "hybrid" ]]; then
     hybrid_gateway_port=$(getHybridGatewayPort)
     ssh_hybrid_gateway="-L localhost:$hybrid_gateway_port:$IP:$hybrid_gateway_port"
-    echo "$NAMESPACE.gateway:   http://$display_IP:$hybrid_gateway_port/"
+    echo "$NAMESPACE.gateway:           http://$display_IP:$hybrid_gateway_port/"
     hybrid_redis_port=$(getHybridRedisPort)
     ssh_hybrid_redis="-L localhost:$hybrid_redis_port:$IP:$hybrid_redis_port"
-    echo "$NAMESPACE.redis:     redis-cli -h $display_IP -p $hybrid_redis_port"
+    echo "$NAMESPACE.redis:             redis-cli -h $display_IP -p $hybrid_redis_port"
   fi
   if [[ $(cat /sys/devices/virtual/dmi/id/board_vendor) == "Amazon EC2" ]]; then
     # report the ssh command to map the service ports back to localhost
