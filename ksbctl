@@ -534,45 +534,88 @@ function getHybridGatewayPort {
 
 function reportSanboxInfo {
   typeset https
+  # envs to hold ssh port forwarding details for when we're on EC2
+  typeset ssh_dashboard; typeset dashboard_port
+  typeset ssh_edp; typeset edp_port
+  typeset ssh_control_gateway; typeset control_gateway_port
+  typeset ssh_mdcb; typeset mdcb_port
+  typeset ssh_edge_gateway; typeset edge_gateway_port
+  typeset ssh_mongodb; typeset mongodb_port
+  typeset ssh_postgres; typeset postgres_port
+  typeset ssh_control_redis; typeset control_redis_port
+  typeset ssh_edge_redis; typeset edge_redis_port
+  typeset ssh_standalone_gateway; typeset standalone_gateway_port
+  typeset ssh_hybrid_gateway; typeset hybrid_gateway_port
+  typeset ssh_hybrid_redis; typeset hybrid_redis_port
   echo "$NAMESPACE.Description:       $(getDescription)"
   if [[ $KSBX_TYPE == 'pro'  || $KSBX_TYPE == 'mdcb' ]]; then
-    echo "$NAMESPACE.dashboard:         http://$IP:$(getDashboardPort)/"
+    dashboard_port=$(getDashboardPort)
+    ssh_dashboard="-L localhost:$dashboard_port:$IP:$dashboard_port"
+    echo "$NAMESPACE.dashboard:         http://$IP:$dashboard_port/"
     if [[ $KSBX_HAS_EDP != "null" ]]; then
-      echo "$NAMESPACE.portal:            http://$IP:$(getPortalPort)/"
+      edp_port=$(getPortalPort)
+      ssh_edp="-L localhost:$edp_port:$IP:$edp_port"
+      echo "$NAMESPACE.portal:            http://$IP:$edp_port/"
     fi
-    echo "$NAMESPACE.control-gateway:   http://$IP:$(getControlGatewayPort)/"
+    control_gateway_port=$(getControlGatewayPort)
+    ssh_control_gateway="-L localhost:$control_gateway_port:$IP:$control_gateway_port"
+    echo "$NAMESPACE.control-gateway:   http://$IP:$control_gateway_port/"
     if [[ $KSBX_TYPE == "mdcb" ]]; then
-      echo "$NAMESPACE.MDCBport:          $IP:$(getMDCBPort)"
+      mdcb_port=$(getMDCBPort)
+      ssh_mdcb="-L localhost:$mdcb_port:$IP:$mdcb_port"
+      echo "$NAMESPACE.MDCBport:          $IP:$mdcb_port"
       https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
+      edge_gateway_port=$(getEdgeGatewayPort)
+      ssh_edge_gateway="-L localhost:$edge_gateway_port:$IP:$edge_gateway_port"
       if [[ $https == 'true' ]]; then
-        echo "$NAMESPACE.edge-gateway:      https://$IP:$(getEdgeGatewayPort)/"
+        echo "$NAMESPACE.edge-gateway:      https://$IP:$edge_gateway_port/"
       else
-        echo "$NAMESPACE.edge-gateway:      http://$IP:$(getEdgeGatewayPort)/"
+        echo "$NAMESPACE.edge-gateway:      http://$IP:$edge_gateway_port/"
       fi
     fi
     if [[ $KSBX_DATABASE == 'mongo' ]]; then
       checkMongoShellInstalled
-      #echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet --host $IP --port $(getMongoPort)"
-      echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet mongodb://$IP:$(getMongoPort)/tyk_analytics"
+      mongodb_port=$(getMongoPort)
+      ssh_mongodb="-L localhost:$mongodb_port:$IP:$mongodb_port"
+      echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet mongodb://$IP:$mongodb_port/tyk_analytics"
     fi
     if [[ $KSBX_DATABASE == 'postgres' ]]; then
-      echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$(getPostgresPort)"
+      postgres_port=$(getPostgresPort)
+      ssh_postgres="-L localhost:$postgres_port:$IP:$postgres_port"
+      echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$postgres_port"
     fi
+    control_redis_port=$(getControlRedisPort)
+    ssh_control_redis="-L localhost:$control_redis_port:$IP:$control_redis_port"
     if [[ $KSBX_TYPE == "mdcb" ]]; then
-      echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $(getControlRedisPort)"
-      echo "$NAMESPACE.edge-redis:        redis-cli -h $IP -p $(getEdgeRedisPort)"
+      edge_redis_port=$(getEdgeRedisPort)
+      ssh_edge_redis="-L localhost:$edge_redis_port:$IP:$edge_redis_port"
+      echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $control_redis_port"
+      echo "$NAMESPACE.edge-redis:        redis-cli -h $IP -p $edge_redis_port"
     else
-      echo "$NAMESPACE.redis:             redis-cli -h $IP -p $(getControlRedisPort)"
+      echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $control_redis_port"
     fi
     echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
     echo "$NAMESPACE.OrgID:             $(getOrgID)"
   elif [[ $KSBX_TYPE == "standalone" ]]; then
-    echo "$NAMESPACE.gateway:   http://$IP:$(getStandaloneGatewayPort)/"
-    echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getControlRedisPort)"
+    standalone_gateway_port=$(getStandaloneGatewayPort)
+    ssh_standalone_gateway="-L localhost:$standalone_gateway_port:$IP:$standalone_gateway_port"
+    echo "$NAMESPACE.gateway:   http://$IP:$standalone_gateway_port/"
+    control_redis_port=$(getControlRedisPort)
+    ssh_control_redis="-L localhost:$control_redis_port:$IP:$control_redis_port"
+    echo "$NAMESPACE.redis:     redis-cli -h $IP -p $control_redis_port"
   elif [[ $KSBX_TYPE == "hybrid" ]]; then
-    echo "$NAMESPACE.gateway:   http://$IP:$(getHybridGatewayPort)/"
-    echo "$NAMESPACE.redis:     redis-cli -h $IP -p $(getHybridRedisPort)"
+    hybrid_gateway_port=$(getHybridGatewayPort)
+    ssh_hybrid_gateway="-L localhost:$hybrid_gateway_port:$IP:$hybrid_gateway_port"
+    echo "$NAMESPACE.gateway:   http://$IP:$hybrid_gateway_port/"
+    hybrid_redis_port=$(getHybridRedisPort)
+    ssh_hybrid_redis="-L localhost:$hybrid_redis_port:$IP:$hybrid_redis_port"
+    echo "$NAMESPACE.redis:     redis-cli -h $IP -p $hybrid_redis_port"
   fi
+  if [[ $(cat /sys/devices/virtual/dmi/id/board_vendor) == "Amazon EC2" ]]; then
+    # report the ssh command to map the service ports back to localhost
+    echo "$NAMESPACE.ssh                ssh $ssh_dashboard $ssh_edp $ssh_control_gateway $ssh_mdcb $ssh_edge_gateway $ssh_mongodb $ssh_postgres $ssh_control_redis $ssh_edge_redis $ssh_standalone_gateway $ssh_hybrid_gateway $ssh_hybrid_redis"
+  fi
+
   # if the namespace has the label 'istio-injection=enabled' then report the istio-system services
   if kubectl get ns --show-labels --no-headers=true $NAMESPACE | grep -q $ISTIO_INJECTION_LABEL; then
     echo "Kiali:                        http://$IP:$(kubectl get svc -n istio-system kiali --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
