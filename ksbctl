@@ -547,69 +547,75 @@ function reportSanboxInfo {
   typeset ssh_standalone_gateway; typeset standalone_gateway_port
   typeset ssh_hybrid_gateway; typeset hybrid_gateway_port
   typeset ssh_hybrid_redis; typeset hybrid_redis_port
+  typeset display_IP
+  if [[ $(cat /sys/devices/virtual/dmi/id/board_vendor) == "Amazon EC2" ]]; then
+    display_IP=localhost
+  else
+    display_IP=$IP
+  fi
   echo "$NAMESPACE.Description:       $(getDescription)"
   if [[ $KSBX_TYPE == 'pro'  || $KSBX_TYPE == 'mdcb' ]]; then
     dashboard_port=$(getDashboardPort)
     ssh_dashboard="-L localhost:$dashboard_port:$IP:$dashboard_port"
-    echo "$NAMESPACE.dashboard:         http://$IP:$dashboard_port/"
+    echo "$NAMESPACE.dashboard:         http://$display_IP:$dashboard_port/"
     if [[ $KSBX_HAS_EDP != "null" ]]; then
       edp_port=$(getPortalPort)
       ssh_edp="-L localhost:$edp_port:$IP:$edp_port"
-      echo "$NAMESPACE.portal:            http://$IP:$edp_port/"
+      echo "$NAMESPACE.portal:            http://$display_IP:$edp_port/"
     fi
     control_gateway_port=$(getControlGatewayPort)
     ssh_control_gateway="-L localhost:$control_gateway_port:$IP:$control_gateway_port"
-    echo "$NAMESPACE.control-gateway:   http://$IP:$control_gateway_port/"
+    echo "$NAMESPACE.control-gateway:   http://$display_IP:$control_gateway_port/"
     if [[ $KSBX_TYPE == "mdcb" ]]; then
       mdcb_port=$(getMDCBPort)
       ssh_mdcb="-L localhost:$mdcb_port:$IP:$mdcb_port"
-      echo "$NAMESPACE.MDCBport:          $IP:$mdcb_port"
+      echo "$NAMESPACE.MDCBport:          $display_IP:$mdcb_port"
       https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
       edge_gateway_port=$(getEdgeGatewayPort)
-      ssh_edge_gateway="-L localhost:$edge_gateway_port:$IP:$edge_gateway_port"
+      ssh_edge_gateway="-L localhost:$edge_gateway_port:$display_IP:$edge_gateway_port"
       if [[ $https == 'true' ]]; then
-        echo "$NAMESPACE.edge-gateway:      https://$IP:$edge_gateway_port/"
+        echo "$NAMESPACE.edge-gateway:      https://$display_IP:$edge_gateway_port/"
       else
-        echo "$NAMESPACE.edge-gateway:      http://$IP:$edge_gateway_port/"
+        echo "$NAMESPACE.edge-gateway:      http://$display_IP:$edge_gateway_port/"
       fi
     fi
     if [[ $KSBX_DATABASE == 'mongo' ]]; then
       checkMongoShellInstalled
       mongodb_port=$(getMongoPort)
       ssh_mongodb="-L localhost:$mongodb_port:$IP:$mongodb_port"
-      echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet mongodb://$IP:$mongodb_port/tyk_analytics"
+      echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet mongodb://$display_IP:$mongodb_port/tyk_analytics"
     fi
     if [[ $KSBX_DATABASE == 'postgres' ]]; then
       postgres_port=$(getPostgresPort)
       ssh_postgres="-L localhost:$postgres_port:$IP:$postgres_port"
-      echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$postgres_port"
+      echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$display_IP --port=$postgres_port"
     fi
     control_redis_port=$(getControlRedisPort)
     ssh_control_redis="-L localhost:$control_redis_port:$IP:$control_redis_port"
     if [[ $KSBX_TYPE == "mdcb" ]]; then
       edge_redis_port=$(getEdgeRedisPort)
       ssh_edge_redis="-L localhost:$edge_redis_port:$IP:$edge_redis_port"
-      echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $control_redis_port"
-      echo "$NAMESPACE.edge-redis:        redis-cli -h $IP -p $edge_redis_port"
+      echo "$NAMESPACE.control-redis:     redis-cli -h $display_IP -p $control_redis_port"
+      echo "$NAMESPACE.edge-redis:        redis-cli -h $display_IP -p $edge_redis_port"
     else
-      echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $control_redis_port"
+      echo "$NAMESPACE.control-redis:     redis-cli -h $display_IP -p $control_redis_port"
     fi
     echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
     echo "$NAMESPACE.OrgID:             $(getOrgID)"
   elif [[ $KSBX_TYPE == "standalone" ]]; then
     standalone_gateway_port=$(getStandaloneGatewayPort)
     ssh_standalone_gateway="-L localhost:$standalone_gateway_port:$IP:$standalone_gateway_port"
-    echo "$NAMESPACE.gateway:   http://$IP:$standalone_gateway_port/"
+    echo "$NAMESPACE.gateway:   http://$display_IP:$standalone_gateway_port/"
     control_redis_port=$(getControlRedisPort)
     ssh_control_redis="-L localhost:$control_redis_port:$IP:$control_redis_port"
-    echo "$NAMESPACE.redis:     redis-cli -h $IP -p $control_redis_port"
+    echo "$NAMESPACE.redis:     redis-cli -h $display_IP -p $control_redis_port"
   elif [[ $KSBX_TYPE == "hybrid" ]]; then
     hybrid_gateway_port=$(getHybridGatewayPort)
     ssh_hybrid_gateway="-L localhost:$hybrid_gateway_port:$IP:$hybrid_gateway_port"
-    echo "$NAMESPACE.gateway:   http://$IP:$hybrid_gateway_port/"
+    echo "$NAMESPACE.gateway:   http://$display_IP:$hybrid_gateway_port/"
     hybrid_redis_port=$(getHybridRedisPort)
     ssh_hybrid_redis="-L localhost:$hybrid_redis_port:$IP:$hybrid_redis_port"
-    echo "$NAMESPACE.redis:     redis-cli -h $IP -p $hybrid_redis_port"
+    echo "$NAMESPACE.redis:     redis-cli -h $display_IP -p $hybrid_redis_port"
   fi
   if [[ $(cat /sys/devices/virtual/dmi/id/board_vendor) == "Amazon EC2" ]]; then
     # report the ssh command to map the service ports back to localhost
