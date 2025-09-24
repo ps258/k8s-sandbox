@@ -1,5 +1,7 @@
 #!/bin/bash -x
 
+# This script is run on the local machine. It copies over what I need to on the EC2 instance
+
 PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 
 if [[ $# < 1 ]]; then

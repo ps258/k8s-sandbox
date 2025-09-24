@@ -1,6 +1,9 @@
 #!/bin/bash
 
-# commands to setup a host so that it can run sandboxes
+PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
+
+# This script is run by aws-setup on the EC2 host and gets it ready to run sandboxes
+# It's called twice. The second time is after docker is setup and $USER is added to the docker groups
 
 if [[ ! -d code ]]; then
   # create subdir and clone repos
