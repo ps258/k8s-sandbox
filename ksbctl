@@ -339,8 +339,10 @@ function setupMinikube {
       # give it a few seconds to settle down
       sleep 5
     else
-      echo "[WARN]Minikube cluster '$CLUSTER' is already running. Not starting it again"
+      echo "[WARN]Minikube cluster '$CLUSTER' is already running. Not setting it up again"
     fi
+    # check that the bastion image is available in minikube and build it if not.
+    $SCRIPTDIR/tbi/build-and-register.sh
   else
     echo "[WARN]Minikube not installed. Cannot start"
   fi

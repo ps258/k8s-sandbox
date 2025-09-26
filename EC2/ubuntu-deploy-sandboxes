@@ -71,4 +71,6 @@ else
   # already done most of the setup
   # for tyk-sandbox we need a local httpbin. This works on ARM64
   docker run -d --restart unless-stopped -p 80:8080 mccutchen/go-httpbin
+  # create the bastion image
+  code/k8s-sandbox/tbi/build-and-register.sh
 fi
