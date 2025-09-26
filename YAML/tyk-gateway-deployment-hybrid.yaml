@@ -36,7 +36,7 @@ spec:
           - name: TYK_LOGLEVEL
             value: "${KSBX_LOG_LEVEL}"
           - name: TYK_GW_OPENTELEMETRY_RESOURCENAME
-            value: "${KSBX_NS}"
+            value: "${KSBX_NS}-hybrid"
         command: ["/opt/tyk-gateway/tyk", "--conf=/etc/tyk-gateway/tyk_gateway.conf"]
         workingDir: /opt/tyk-gateway
         ports:
