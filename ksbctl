@@ -307,7 +307,7 @@ function startMinikube {
     quiet=true
   fi
   if minikubeProfileExists; then
-    if [[ $(minikube profile list | awk '/'$CLUSTER'/ {print $14}') = 'Stopped' ]]; then
+    if [[ $(minikube profile list | awk '/'$CLUSTER'/ && /Stopped/ {print "Stopped"}') = 'Stopped' ]]; then
       minikube -p $CLUSTER start
     else
       if [[ -z $quiet ]]; then
