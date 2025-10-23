@@ -363,7 +363,7 @@ function setupHelmAndOperator {
     sleep 30
     kubectl create namespace tyk-operator-system
     #TYK_OPERATOR_LICENSEKEY=$(echo $SBX_LICENSE | base64 -w 0)
-    kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true" --from-literal "TYK_OPERATOR_LICENSEKEY=$SBX_LICENSE"
+    kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_OPERATOR_LICENSEKEY=$SBX_LICENSE"
     helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
     helm repo update
     echo "[INFO]Attempting to deploy operator using helm. This may take a while"
@@ -372,7 +372,7 @@ function setupHelmAndOperator {
       kubectl delete ns tyk-operator-system --wait
       kubectl create namespace tyk-operator-system
       #kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
-      kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "FRED=true" --from-literal "TYK_OPERATOR_LICENSEKEY=$SBX_LICENSE"
+      kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_OPERATOR_LICENSEKEY=$SBX_LICENSE"
       sleep 10
       echo "[INFO]Reattempting to deploy operator using helm. This may take a while"
       if ! helm install tyk-operator tyk-helm/tyk-operator -n tyk-operator-system $operatorVersion; then
@@ -1039,26 +1039,42 @@ function publishAPIs {
     if [[ -n $adminKey ]]; then
       for APIfile in "$@"; do
         echo "[INFO]Publishing API $APIfile"
-        if $(jq 'has("oas")' $APIfile) == "true"; then
-          mv $APIfile tmpfile
-          jq .oas tmpfile > $APIfile
-          rm tmpfile
-          echo curl -X POST -H \"Content-Type: application/json\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis/oas -d@\"$APIfile\"
-          curl -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis/oas -d@"$APIfile"
-        elif grep -q x-tyk-api-gateway "$APIfile"; then
-          # OAS
-          echo curl -X POST -H \"Content-Type: application/json\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis/oas -d@\"$APIfile\"
-          curl -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis/oas -d@"$APIfile"
-        elif grep -q api_definition "$APIfile"; then
-          # deal with the files that are a copy and paste of the API JSON from the dashboard
-          echo curl -s -X POST -H \"Content-Type: application/json\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis -d @\"$APIfile\"
-          curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfile"
+        if [[ $(awk '!/^\s+$/ {print substr($1,1,1); exit}' $APIfile) == '{' ]] ; then
+          # We're dealing with a JSON file because the first character in the file is a '{'
+          if [[ $(jq 'has("oas")' $APIfile) == "true" ]]; then
+            mv $APIfile tmpfile
+            jq .oas tmpfile > $APIfile
+            rm tmpfile
+            echo curl -X POST -H \"Content-Type: application/json\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis/oas -d@\"$APIfile\"
+            curl -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis/oas -d@"$APIfile"
+          elif grep -q x-tyk-api-gateway "$APIfile"; then
+            # OAS
+            echo curl -X POST -H \"Content-Type: application/json\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis/oas -d@\"$APIfile\"
+            curl -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis/oas -d@"$APIfile"
+          elif grep -q api_definition "$APIfile"; then
+            # deal with the files that are a copy and paste of the API JSON from the dashboard
+            echo curl -s -X POST -H \"Content-Type: application/json\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis -d @\"$APIfile\"
+            curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfile"
+          else
+            # deal with the files that are exported APIs from the dashboard
+            APIfileName=$(mktemp "/tmp/$(basename '$APIfile').XXXXXX")
+            createApiDefintion "$APIfile" > $APIfileName
+            curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfileName"
+            \rm $APIfileName
+          fi
         else
-          # deal with the files that are exported APIs from the dashboard
-          APIfileName=$(mktemp "/tmp/$(basename '$APIfile').XXXXXX")
-          createApiDefintion "$APIfile" > $APIfileName
-          curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfileName" 
-          \rm $APIfileName
+          # We're probably dealing with a YAML file since the first character in the file is NOT a '{'
+          if grep -q x-tyk-api-gateway "$APIfile"; then
+            # Tyk OAS
+            echo curl -X POST -H \"Content-Type: application/x-yaml\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis/oas --data-binary @$APIfile
+            curl -X POST -H "Content-Type: application/x-yaml" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis/oas --data-binary @$APIfile
+            echo
+          else
+            # Standard OAS
+            echo curl -X POST -H \"Content-Type: application/x-yaml\" -H \"Authorization: $adminKey\" http://$IP:$DashboardPort/api/apis/oas/import --data-binary @$APIfile
+            curl -X POST -H "Content-Type: application/x-yaml" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis/oas/import --data-binary @$APIfile
+            echo
+          fi
         fi
       done
     else
@@ -1172,7 +1188,7 @@ if [[ $# -gt 0 ]]; then
   # setup global aliases and variables
   setGlobals
   startMinikube quiet
-  case $1 in 
+  case $1 in
 
     create)
       shift
@@ -1378,7 +1394,7 @@ if [[ $# -gt 0 ]]; then
             if [[ -n $KSBX_EDP_VERS ]]; then
               echo -n ", EDP $KSBX_EDP_VERS"
             fi
-            echo 
+            echo
           else
             echo "[FATAL]Unable to find '$sandboxVersion' in '$VERSIONFILE'"
             exit 1
@@ -1470,7 +1486,7 @@ if [[ $# -gt 0 ]]; then
           fi
           listPods
           getInstallType
-          reportSanboxInfo 
+          reportSanboxInfo
         elif [[ $KSBX_TYPE == 'standalone' ]]; then
           # create standalone (CE) deployment of the gateway
           loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
@@ -1496,7 +1512,7 @@ if [[ $# -gt 0 ]]; then
             fi
           fi
           listPods
-          reportSanboxInfo 
+          reportSanboxInfo
         elif [[ $KSBX_TYPE == 'hybrid' ]]; then
           # a hybrid deployment with KSBX_CONTROL_PLANE as the control plane
           loadVersions $(grep -e "^$sandboxVersion," $VERSIONFILE | head -1 | cut -d, -f1,2)
@@ -1516,7 +1532,7 @@ if [[ $# -gt 0 ]]; then
           applyYAMLtemplate tyk-gateway-svc-hybrid.yaml
           waitDeploymentReady hybrid-gateway
           listPods
-          reportSanboxInfo 
+          reportSanboxInfo
         fi
       else
         echo "[FATAL]Namespace '$NAMESPACE' already exists"
