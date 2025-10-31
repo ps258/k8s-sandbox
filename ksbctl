@@ -338,6 +338,8 @@ function setupMinikube {
       minikube -p $CLUSTER addons enable dashboard
       # give it a few seconds to settle down
       sleep 5
+      # install cert-manager now so that its ready when needed
+      kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.19.1/cert-manager.yaml --wait
     else
       echo "[WARN]Minikube cluster '$CLUSTER' is already running. Not setting it up again"
     fi
@@ -358,9 +360,9 @@ function setupHelmAndOperator {
     operatorVersion="--version $KSBX_OPERATOR_VERSION"
   fi
   if which helm > /dev/null 2>&1; then
-    kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.17.0/cert-manager.yaml --wait
-    echo "[INFO]Sleeping for 30 seconds to allow the cert-manager to start, be patient"
-    sleep 30
+    #kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.17.0/cert-manager.yaml --wait
+    #echo "[INFO]Sleeping for 30 seconds to allow the cert-manager to start, be patient"
+    #sleep 30
     kubectl create namespace tyk-operator-system
     #TYK_OPERATOR_LICENSEKEY=$(echo $SBX_LICENSE | base64 -w 0)
     kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_OPERATOR_LICENSEKEY=$SBX_LICENSE"
