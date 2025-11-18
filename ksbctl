@@ -97,7 +97,7 @@ INT_CPGW_URL=http://control-gateway:8080
 
 function help {
   typeset name
-  name=$(basename $SCRIPTNAME)
+  name=$SCRIPTNAME
   echo "[USAGE]: $name create -v <tyk version> -t <namespace description> -N <namespace name> [-p|-s] [-c gateway_count] [-e edge_gw_count] [-m] [-o] [-i]"
   echo "      Create a tyk instance in a namespace sandbox with the version given as a tag with -v"
   echo "      -c The number of control plane gateway replicas to run"
@@ -451,7 +451,7 @@ function waitPodReady {
   echo " done"
 }
 
-# return the sandbox-details which is a summary saved when the sandbox is created
+# return the description of the sandbox which is stored in sandbox-details when the sandbox was created
 function getDescription {
   kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data.KSBX_DESCRIPTION
 }
@@ -836,7 +836,7 @@ function showTykVersions {
   typeset key; typeset value; typeset report; typeset sandboxDetails; typeset description
   sandboxDetails=$(kubectl get configmap sandbox-details -n $NAMESPACE -o json | jq -r .data)
   report=''
-  for key in KSBX_DATABASE KSBX_MDCB KSBX_PMP KSBX_GW KSBX_DB KSBX_TYPE KSBX_VERSION KSBX_EDP; do
+  for key in KSBX_VERSION KSBX_TYPE KSBX_DATABASE KSBX_DB KSBX_GW KSBX_EDP KSBX_PMP KSBX_MDCB; do
     value=$(echo $sandboxDetails | jq -r .$key)
     if [[ $value != 'null' ]]; then
       report="$report $key=$value"
