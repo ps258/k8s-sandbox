@@ -1583,7 +1583,7 @@ if [[ $# -gt 0 ]]; then
         typeset allSandboxes
         allSandboxes=$(getAllSandboxes)
         if [[ $allSandboxes = "" ]]; then
-          echo "[INFO]No sandboxes configured"
+          echo "[INFO]No kubernetes sandboxes configured"
           exit 0
         fi
         set $allSandboxes
