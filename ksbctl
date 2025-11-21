@@ -125,7 +125,7 @@ function help {
   echo "$name delete <sandbox namespace...>"
   echo "      Delete the sandbox namespace given as a tag and all resources in it"
   echo "$name get <sandbox namespace...> [description|dashboard|control-gw|control-redis|edge-gw|edge-redis|key|mdcb|mongo|postgres|orgid]"
-  echo "      print the requested detail in a way that's useful in another script"
+  echo "      Print the requested detail in a way that's useful in another script"
   echo "$name info <sandbox namespace...>"
   echo "      Print info detailed info on sandbox namespaces"
   echo "$name init"
