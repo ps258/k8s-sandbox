@@ -893,16 +893,6 @@ function runShell {
   typeset orgid
   typeset https
   typeset TYK_EDGE_GW
-  adminKey=$(getAdminUserKey)
-  orgid=$(getOrgID)
-  if [[ $KSBX_TYPE == 'mdcb' ]]; then
-    https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json 2>&- | jq -r .metadata.labels.https)
-    if [[ $https == 'true' ]]; then
-      TYK_EDGE_GW="TYK_EDGE_GW=https://edge-gateway:8080"
-    else
-      TYK_EDGE_GW="TYK_EDGE_GW=http://edge-gateway:8080"
-    fi
-  fi
   for podPartName in $*
   do
     echo "[INFO]Creating shell for $podPartName"
@@ -913,7 +903,18 @@ function runShell {
       if echo $pod | grep -q bastion; then
         # the bastion host is RHEL and setup as I want it so just create a shell
         # but populate the environment with handy values
-        kubectl exec $pod -n $NAMESPACE -it -- env TYK_KEY=$adminKey TYK_ORG=$orgid TYK_DSHB=$INT_DSHB_URL TYK_GW=$INT_CPGW_URL $TYK_EDGE_GW /bin/sh
+        adminKey=$(getAdminUserKey)
+        orgid=$(getOrgID)
+        if [[ $KSBX_TYPE == 'mdcb' ]]; then
+          https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json 2>&- | jq -r .metadata.labels.https)
+          if [[ $https == 'true' ]]; then
+            TYK_EDGE_GW="TYK_EDGE_GW=https://edge-gateway:8080"
+          else
+            TYK_EDGE_GW="TYK_EDGE_GW=http://edge-gateway:8080"
+          fi
+        fi
+        echo "[INFO]Setting TYK_KEY=$adminKey TYK_ORG=$orgid TYK_DSHB=$INT_DSHB_URL TYK_GW=$INT_CPGW_URL $TYK_EDGE_GW for convenience"
+        kubectl exec $pod -n $NAMESPACE -it -- env TYK_KEY=$adminKey TYK_ORG=$orgid TYK_DSHB=$INT_DSHB_URL TYK_GW=$INT_CPGW_URL $TYK_EDGE_GW /bin/bash
       else
         # if ncurses-base isnt installed then TERM isn't recognised
         # I found it was installed in some images but not others
