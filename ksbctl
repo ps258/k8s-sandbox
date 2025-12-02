@@ -760,7 +760,7 @@ function applyYAMLtemplate {
       fi
       kubectl apply -n $NAMESPACE -f $tmpYamlFile
     fi
-    #rm -f $tmpYamlFile
+    rm -f $tmpYamlFile
   done
 }
 
