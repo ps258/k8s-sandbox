@@ -935,7 +935,7 @@ function showLogs {
   typeset podPartName
   typeset pod
   podPartName=$1
-  pod=$(getPodNames $podPartName | sort | head -1)
+  pod=$(getPodNames $podPartName | sort | xargs -n 1 | head -1)
   if [[ -n $pod ]]; then
     echo "[INFO]kubectl logs -n $NAMESPACE $pod -f"
     kubectl logs -n $NAMESPACE $pod -f
