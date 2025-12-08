@@ -1254,7 +1254,7 @@ if [[ $# -gt 0 ]]; then
             if echo $OPTARG | egrep -qw 'debug|info|warning|error'; then
               KSBX_LOG_LEVEL=$OPTARG
             else
-              echo "[FATAL]Loglevel must be one of debug, info, warnding or error"
+              echo "[FATAL]Loglevel must be one of debug, info, warning or error"
               exit 1
             fi
             ;;
