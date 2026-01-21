@@ -334,12 +334,16 @@ function setupMinikube {
       echo "[INFO]Starting minikube cluster '$CLUSTER'"
       minikube -p $CLUSTER start --driver docker --cpus max --memory $(free -g | awk '/Mem:/ {print $NF "g"}') --docker-opt="default-ulimit=nofile=204800:204800" $mount_command
       minikube profile $CLUSTER
+      set -x
       minikube -p $CLUSTER addons enable metrics-server
       minikube -p $CLUSTER addons enable dashboard
       # give it a few seconds to settle down
       sleep 5
+      # patch the metrics server to keep 2 hours of metrics with 1m granularity
+      kubectl patch deployment dashboard-metrics-scraper -p '{"spec":{"template":{"spec":{"containers":[{"name":"dashboard-metrics-scraper","args":["--metric-duration=2h","--metric-resolution=60s"]}]}}}}' -n kubernetes-dashboard
       # install cert-manager now so that its ready when needed
       kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.19.1/cert-manager.yaml --wait
+      set +x
     else
       echo "[WARN]Minikube cluster '$CLUSTER' is already running. Not setting it up again"
     fi
