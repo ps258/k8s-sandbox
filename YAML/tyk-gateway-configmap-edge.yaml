@@ -8,6 +8,9 @@ metadata:
 data:
   tyk_gateway.conf: |-
     {
+      "access_logs": {
+        "enabled": true
+      },
       "allow_insecure_configs": true,
       "allow_master_keys": false,
       "allow_remote_config": false,
