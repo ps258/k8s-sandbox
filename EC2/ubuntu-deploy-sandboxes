@@ -14,6 +14,7 @@ if [[ ! -d code ]]; then
   git clone git@github.com:ps258/tyk-sandbox.git
   git clone git@github.com:ps258/tyk-scripts.git
   git clone git@github.com:ps258/k8s-sandbox.git
+  git clone git@github.com:ps258/helm-sandbox.git
   cd ~
 
   # install packages
@@ -62,15 +63,18 @@ if [[ ! -d code ]]; then
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   sudo usermod -aG docker $USER
 
-  echo 'PATH=$PATH:$HOME/code/tyk-sandbox:$HOME/code/k8s-sandbox:$HOME/code/tyk-sandbox/scripts:$HOME/code/tyk-scripts/python' >> ~/.bashrc
+  echo 'PATH=$PATH:$HOME/code/tyk-sandbox:$HOME/code/k8s-sandbox:$HOME/code/helm-sandbox:$HOME/code/tyk-sandbox/scripts:$HOME/code/tyk-scripts/python' >> ~/.bashrc
   echo 'alias k="minikube kubectl -- "' >> ~/.bashrc
   echo "alias ks=ksbctl" >> ~/.bashrc
+  echo "alias hs=hsbctl" >> ~/.bashrc
   echo "alias ds=dsbctl" >> ~/.bashrc
   echo $(hostname -i) httpbin.org | sudo tee -a /etc/hosts
 else
   # already done most of the setup
   # for tyk-sandbox we need a local httpbin. This works on ARM64
   docker run -d --restart unless-stopped -p 80:8080 mccutchen/go-httpbin
+  # setup minikube env
+  ksbctl init
   # create the bastion image
   code/k8s-sandbox/tbi/build-and-register.sh
 fi
