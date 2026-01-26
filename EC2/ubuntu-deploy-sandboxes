@@ -36,7 +36,7 @@ if [[ ! -d code ]]; then
 
   # install yq and minikube
   if [[ $(uname -p) == 'x86_64' ]]; then
-    # x86
+    # installing on x86
     # yq
     wget https://github.com/mikefarah/yq/releases/download/v4.46.1/yq_linux_amd64
     sudo install yq_linux_amd64 /usr/local/bin/yq && rm yq_linux_amd64
@@ -44,7 +44,7 @@ if [[ ! -d code ]]; then
     curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-amd64
     sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
   else
-    # arm
+    # installing on arm
     # yq
     wget https://github.com/mikefarah/yq/releases/download/v4.46.1/yq_linux_arm64
     sudo install yq_linux_arm64 /usr/local/bin/yq && rm yq_linux_arm64
@@ -63,6 +63,17 @@ if [[ ! -d code ]]; then
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   sudo usermod -aG docker $USER
 
+  # install helm
+  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+  # install tyk helm charts
+  helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
+
+  # install bitnami charts
+  helm repo add bitnami https://charts.bitnami.com/bitnami
+
+  helm repo update
+
   echo 'PATH=$PATH:$HOME/code/tyk-sandbox:$HOME/code/k8s-sandbox:$HOME/code/helm-sandbox:$HOME/code/tyk-sandbox/scripts:$HOME/code/tyk-scripts/python' >> ~/.bashrc
   echo 'alias k="minikube kubectl -- "' >> ~/.bashrc
   echo "alias ks=ksbctl" >> ~/.bashrc
@@ -75,6 +86,4 @@ else
   docker run -d --restart unless-stopped -p 80:8080 mccutchen/go-httpbin
   # setup minikube env
   ksbctl init
-  # create the bastion image
-  code/k8s-sandbox/tbi/build-and-register.sh
 fi
