@@ -37,6 +37,8 @@ spec:
             value: "${KSBX_LOG_LEVEL}"
           - name: TYK_GW_OPENTELEMETRY_RESOURCENAME
             value: "${KSBX_NS}"
+          - name: GODEBUG
+            value: "gctrace=1"
         command: ["/opt/tyk-gateway/tyk", "--conf=/etc/tyk-gateway/tyk_gateway.conf"]
         workingDir: /opt/tyk-gateway
         ports:

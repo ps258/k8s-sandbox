@@ -35,6 +35,8 @@ spec:
         env:
           - name: TYK_LOGLEVEL
             value: "${KSBX_LOG_LEVEL}"              
+          - name: GODEBUG
+            value: "gctrace=1"
         command: ["/opt/tyk-dashboard/tyk-analytics", "--conf=/etc/tyk-dashboard/tyk_analytics.conf"]
         workingDir: /opt/tyk-dashboard
         ports:
