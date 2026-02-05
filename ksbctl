@@ -542,6 +542,7 @@ function getHybridGatewayPort {
 
 function reportSanboxInfo {
   typeset https
+  typeset edge_gateway_protocol
   # envs to hold ssh port forwarding details for when we're on EC2
   typeset ssh_dashboard; typeset dashboard_port
   typeset ssh_edp; typeset edp_port
@@ -555,81 +556,116 @@ function reportSanboxInfo {
   typeset ssh_standalone_gateway; typeset standalone_gateway_port
   typeset ssh_hybrid_gateway; typeset hybrid_gateway_port
   typeset ssh_hybrid_redis; typeset hybrid_redis_port
-  typeset display_IP
+  typeset isEC2
   if [[ $(cat /sys/devices/virtual/dmi/id/board_vendor) == "Amazon EC2" ]]; then
-    display_IP=localhost
-  else
-    display_IP=$IP
+    isEC2=True
   fi
   echo "$NAMESPACE.Description:       $(getDescription)"
   if [[ $KSBX_TYPE == 'pro'  || $KSBX_TYPE == 'mdcb' ]]; then
     dashboard_port=$(getDashboardPort)
     ssh_dashboard="-L localhost:$dashboard_port:$IP:$dashboard_port"
-    echo "$NAMESPACE.dashboard:         http://$display_IP:$dashboard_port/"
+    echo "$NAMESPACE.dashboard:         http://$IP:$dashboard_port/"
+    if [[ -n $isEC2 ]]; then
+      echo "$NAMESPACE.dashboard:             http://localhost:$dashboard_port/"
+    fi
     if [[ $KSBX_HAS_EDP != "null" ]]; then
       edp_port=$(getPortalPort)
       ssh_edp="-L localhost:$edp_port:$IP:$edp_port"
-      echo "$NAMESPACE.portal:            http://$display_IP:$edp_port/"
+      echo "$NAMESPACE.portal:            http://$IP:$edp_port/"
+      if [[ -n $isEC2 ]]; then
+        echo "$NAMESPACE.portal:              http://localhost:$edp_port/"
+      fi
     fi
     control_gateway_port=$(getControlGatewayPort)
     ssh_control_gateway="-L localhost:$control_gateway_port:$IP:$control_gateway_port"
-    echo "$NAMESPACE.control-gateway:   http://$display_IP:$control_gateway_port/"
+    echo "$NAMESPACE.control-gateway:   http://$IP:$control_gateway_port/"
+    if [[ -n $isEC2 ]]; then
+      echo "$NAMESPACE.control-gateway:       http://localhost:$control_gateway_port/"
+    fi
     if [[ $KSBX_TYPE == "mdcb" ]]; then
       mdcb_port=$(getMDCBPort)
       ssh_mdcb="-L localhost:$mdcb_port:$IP:$mdcb_port"
-      echo "$NAMESPACE.MDCBport:          $display_IP:$mdcb_port"
+      echo "$NAMESPACE.MDCBport:          $IP:$mdcb_port"
+      if [[ -n $isEC2 ]]; then
+        echo "$NAMESPACE.MDCBport:              localhost:$mdcb_port"
+      fi
       https=$(kubectl get deploy edge-gateway -n $NAMESPACE -o json | jq -r .metadata.labels.https)
+      if [[ $https == 'true' ]]; then
+        edge_gateway_protocol=https
+      else
+        edge_gateway_protocol=http
+      fi
       edge_gateway_port=$(getEdgeGatewayPort)
       ssh_edge_gateway="-L localhost:$edge_gateway_port:$IP:$edge_gateway_port"
-      if [[ $https == 'true' ]]; then
-        echo "$NAMESPACE.edge-gateway:      https://$display_IP:$edge_gateway_port/"
-      else
-        echo "$NAMESPACE.edge-gateway:      http://$display_IP:$edge_gateway_port/"
+      echo "$NAMESPACE.edge-gateway:      $edge_gateway_protocol://$IP:$edge_gateway_port/"
+      if [[ -n $isEC2 ]]; then
+        echo "$NAMESPACE.edge-gateway:          $edge_gateway_protocol://localhost:$edge_gateway_port/"
       fi
     fi
     if [[ $KSBX_DATABASE == 'mongo' ]]; then
       checkMongoShellInstalled
       mongodb_port=$(getMongoPort)
       ssh_mongodb="-L localhost:$mongodb_port:$IP:$mongodb_port"
-      echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet mongodb://$display_IP:$mongodb_port/tyk_analytics"
+      echo "$NAMESPACE.mongo:             $MONGOSHELL --quiet mongodb://$IP:$mongodb_port/tyk_analytics"
+      if [[ -n $isEC2 ]]; then
+        echo "$NAMESPACE.mongo:                 $MONGOSHELL --quiet mongodb://localhost:$mongodb_port/tyk_analytics"
+      fi
     fi
     if [[ $KSBX_DATABASE == 'postgres' ]]; then
       postgres_port=$(getPostgresPort)
       ssh_postgres="-L localhost:$postgres_port:$IP:$postgres_port"
-      echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$display_IP --port=$postgres_port"
+      echo "$NAMESPACE.postgres:          PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=$IP --port=$postgres_port"
+      if [[ -n $isEC2 ]]; then
+        echo "$NAMESPACE.postgres:              PGPASSWORD=$KSBX_PGPASSWORD psql --username=$KSBX_PGUSER --dbname=$KSBX_PGDB --host=localhost --port=$postgres_port"
+      fi
     fi
     control_redis_port=$(getControlRedisPort)
     ssh_control_redis="-L localhost:$control_redis_port:$IP:$control_redis_port"
+    echo "$NAMESPACE.control-redis:     redis-cli -h $IP -p $control_redis_port"
+    if [[ -n $isEC2 ]]; then
+      echo "$NAMESPACE.control-redis:         redis-cli -h localhost -p $control_redis_port"
+    fi
     if [[ $KSBX_TYPE == "mdcb" ]]; then
       edge_redis_port=$(getEdgeRedisPort)
       ssh_edge_redis="-L localhost:$edge_redis_port:$IP:$edge_redis_port"
-      echo "$NAMESPACE.control-redis:     redis-cli -h $display_IP -p $control_redis_port"
-      echo "$NAMESPACE.edge-redis:        redis-cli -h $display_IP -p $edge_redis_port"
-    else
-      echo "$NAMESPACE.control-redis:     redis-cli -h $display_IP -p $control_redis_port"
+      echo "$NAMESPACE.edge-redis:        redis-cli -h $IP -p $edge_redis_port"
+      if [[ -n $isEC2 ]]; then
+        echo "$NAMESPACE.edge-redis:            redis-cli -h localhost -p $edge_redis_port"
+      fi
     fi
     echo "$NAMESPACE.AdminKey:          $(getAdminUserKey)"
     echo "$NAMESPACE.OrgID:             $(getOrgID)"
   elif [[ $KSBX_TYPE == "standalone" ]]; then
     standalone_gateway_port=$(getStandaloneGatewayPort)
     ssh_standalone_gateway="-L localhost:$standalone_gateway_port:$IP:$standalone_gateway_port"
-    echo "$NAMESPACE.gateway:   http://$display_IP:$standalone_gateway_port/"
+    echo "$NAMESPACE.gateway:   http://$IP:$standalone_gateway_port/"
+    if [[ -n $isEC2 ]]; then
+      echo "$NAMESPACE.gateway:       http://localhost:$standalone_gateway_port/"
+    fi
     control_redis_port=$(getControlRedisPort)
     ssh_control_redis="-L localhost:$control_redis_port:$IP:$control_redis_port"
-    echo "$NAMESPACE.redis:     redis-cli -h $display_IP -p $control_redis_port"
+    echo "$NAMESPACE.redis:     redis-cli -h $IP -p $control_redis_port"
+    if [[ -n $isEC2 ]]; then
+      echo "$NAMESPACE.redis:         redis-cli -h localhost -p $control_redis_port"
+    fi
   elif [[ $KSBX_TYPE == "hybrid" ]]; then
     hybrid_gateway_port=$(getHybridGatewayPort)
     ssh_hybrid_gateway="-L localhost:$hybrid_gateway_port:$IP:$hybrid_gateway_port"
-    echo "$NAMESPACE.gateway:           http://$display_IP:$hybrid_gateway_port/"
+    echo "$NAMESPACE.gateway:           http://$IP:$hybrid_gateway_port/"
+    if [[ -n $isEC2 ]]; then
+      echo "$NAMESPACE.gateway:               http://localhost:$hybrid_gateway_port/"
+    fi
     hybrid_redis_port=$(getHybridRedisPort)
     ssh_hybrid_redis="-L localhost:$hybrid_redis_port:$IP:$hybrid_redis_port"
-    echo "$NAMESPACE.redis:             redis-cli -h $display_IP -p $hybrid_redis_port"
+    echo "$NAMESPACE.redis:             redis-cli -h $IP -p $hybrid_redis_port"
+    if [[ -n $isEC2 ]]; then
+      echo "$NAMESPACE.redis:                 redis-cli -h localhost -p $hybrid_redis_port"
+    fi
   fi
-  if [[ $(cat /sys/devices/virtual/dmi/id/board_vendor) == "Amazon EC2" ]]; then
+  if [[ -n $isEC2 ]]; then
     # report the ssh command to map the service ports back to localhost
     echo "$NAMESPACE.ssh                $(echo ssh $ssh_dashboard $ssh_edp $ssh_control_gateway $ssh_mdcb $ssh_edge_gateway $ssh_mongodb $ssh_postgres $ssh_control_redis $ssh_edge_redis $ssh_standalone_gateway $ssh_hybrid_gateway $ssh_hybrid_redis) <aws hostname>"
   fi
-
   # if the namespace has the label 'istio-injection=enabled' then report the istio-system services
   if kubectl get ns --show-labels --no-headers=true $NAMESPACE | grep -q $ISTIO_INJECTION_LABEL; then
     echo "Kiali:                        http://$IP:$(kubectl get svc -n istio-system kiali --no-headers=true | awk -F '[:/ ]+' '{print $6}')/"
