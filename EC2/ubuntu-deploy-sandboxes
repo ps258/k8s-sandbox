@@ -74,7 +74,8 @@ if [[ ! -d code ]]; then
 
   helm repo update
 
-  echo 'PATH=$PATH:$HOME/code/tyk-sandbox:$HOME/code/k8s-sandbox:$HOME/code/helm-sandbox:$HOME/code/tyk-sandbox/scripts:$HOME/code/tyk-scripts/python' >> ~/.bashrc
+  mkdir bin
+  echo 'PATH=$PATH:$HOME/bin:$HOME/code/tyk-sandbox:$HOME/code/k8s-sandbox:$HOME/code/helm-sandbox:$HOME/code/tyk-sandbox/scripts:$HOME/code/tyk-scripts/python' >> ~/.bashrc
   echo 'alias k="minikube kubectl -- "' >> ~/.bashrc
   echo "alias ks=ksbctl" >> ~/.bashrc
   echo "alias hs=hsbctl" >> ~/.bashrc
