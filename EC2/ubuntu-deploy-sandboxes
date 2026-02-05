@@ -80,6 +80,8 @@ if [[ ! -d code ]]; then
   echo "alias ks=ksbctl" >> ~/.bashrc
   echo "alias hs=hsbctl" >> ~/.bashrc
   echo "alias ds=dsbctl" >> ~/.bashrc
+  # change PS1 to have a space between the hostname and the CWD (for ease copy and paste)
+  sed -i 's/:\\/: \\/' ~/.bashrc
   echo $(hostname -i) httpbin.org | sudo tee -a /etc/hosts
 else
   # already done most of the setup
