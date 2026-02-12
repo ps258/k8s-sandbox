@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 # This script is run on the local machine. It copies over what I need to on the EC2 instance
 
