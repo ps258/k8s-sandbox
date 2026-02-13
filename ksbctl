@@ -1664,7 +1664,7 @@ if [[ $# -gt 0 ]]; then
         [Dd]esc*)
           getDescription
           ;;
-        dash*)
+        [Dd]ash*)
           if [[ $KSBX_TYPE == 'mdcb' || $KSBX_TYPE == 'pro' ]]; then
             echo http://$IP:$(getDashboardPort)/
           else
