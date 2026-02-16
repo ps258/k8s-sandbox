@@ -238,7 +238,6 @@ function checkMDCBlicence {
   fi
 }
 
-
 # verify that a command is in the PATH
 function checkCommandInstalled {
   typeset cmd
