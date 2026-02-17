@@ -6,17 +6,50 @@ PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 CDPATH=
 
 # Dependencies
-#  minikube to run a local kubernetes
 #  ksh to support arrays. the Mac version of bash doesn't
 #  envsubst to populate environment variables into the YAML
 #  mongosh to retrieve things from mongodb (what?)
 #  redis-cli to retrieve admin credentials
+#  jq and yq for manipulating json and YAML
 
-# it may be necessary to increase some limits when running many pods or multiple clusters
+# It may be necessary to increase some limits when running many pods or multiple clusters
 # This worked for me but YMMV
 #  sysctl -w fs.inotify.max_user_watches=2099999999
 #  sysctl -w fs.inotify.max_user_instances=2099999999
 #  sysctl -w fs.inotify.max_queued_events=2099999999
+
+ENVFILE=$HOME/.tyk-sandbox
+# define defaults in $HOME/.tyk-sandbox
+# K8S_DEPLOYMENT is the underlying k8s deployment to use
+# default to minikube for now
+K8S_DEPLOYMENT=k3s
+# if the standard setup file exists take defaults from that
+if [[ -f $ENVFILE ]]; then
+  . $ENVFILE
+fi
+
+# validate the setting of $K8S_DEPLOYMENT. Valid options are "minikube", "k3s" and "none"
+case $K8S_DEPLOYMENT in
+  none|minikube|k3s)
+    ;;
+  *)
+    echo '[FATAL]K8S_DEPLOYMENT is unset or invalid. Valid values are "minikube", "k3s" and "none"'
+    exit 1
+esac
+
+# the multicluster option only works for minikube (and isn't tested any more either)
+if [[ $K8S_DEPLOYMENT == "minikube" ]]; then
+  if [[ -z $KSBCTL_CLUSTER ]]; then
+    if [[ -z $CLUSTER ]]; then
+      CLUSTER=minikube
+    fi
+  else
+    CLUSTER=$KSBCTL_CLUSTER
+  fi
+  alias kubectl="minikube kubectl -- --cluster=$CLUSTER"
+  alias k="minikube kubectl -- --cluster=$CLUSTER"
+  alias helm="helm --kube-context $CLUSTER"
+fi
 
 # check for -C option to specify the cluster
 if [[ $# -ge 2 ]]; then
@@ -26,25 +59,16 @@ if [[ $# -ge 2 ]]; then
   fi
 fi
 
-if [[ -z $KSBCTL_CLUSTER ]]; then
-  if [[ -z $CLUSTER ]]; then
-    CLUSTER=minikube
-  fi
-else
-  CLUSTER=$KSBCTL_CLUSTER
-fi
-alias kubectl="minikube kubectl -- --cluster=$CLUSTER"
-alias helm="helm --kube-context $CLUSTER"
-
+# Globals
 SCRIPTNAME=$0
 SCRIPTDIR=$(
   cd "$(dirname $SCRIPTNAME)"
   echo $PWD
 )
 SCRIPTNAME=$(basename $SCRIPTNAME)
-
 VERSIONFILE="$SCRIPTDIR/tyk-versions.list"
 YAMLDIR="$SCRIPTDIR/YAML"
+
 NAMESPACE_SELECTOR_LABEL="creator=ksbctl"
 NAMESPACE=''
 EXTRA_NAMESPACE_LABELS=''
@@ -83,7 +107,6 @@ export KSBX_PG_PORTAL_THEMES_SIZE=2     # the size to make EDP's /opt/portal/the
 # KSBX_LOCAL_IP is used for the bundle uploader which runs outside k8s (Overridden by SBX_HOST_IP_ADDR if it's defined)
 export KSBX_LOCAL_IP=$(ifconfig -a | awk '/inet/ && !/::/ && !/127.0.0.1/{print $2}' | sort -n | head -1)
 KSBX_CONTROL_PLANE=''
-ENVFILE=~/.tyk-sandbox
 export SBX_LICENSE=""
 SBX_MDCB_LICENSE=""
 SBX_USER=""
@@ -278,25 +301,24 @@ function getMinikubeIP {
 
 # checks done to setup env on every run
 function setGlobals {
-  checkCommandInstalled jq envsubst yq
-  if which minikube > /dev/null 2>&1 ; then
-    # Get the minikube IP address
-    IP=$(getMinikubeIP)
-  else
-    # Fall back to the local IP address
-    IP=$KSBX_LOCAL_IP
-  fi
-}
-
-# copy "$SCRIPTDIR/etc/tmp.conf" into minikube so that permanent volumes can be created
-function setupMinikubeStorage {
-  if which minikube > /dev/null 2>&1 ; then
-    if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
-      echo "[INFO]Configuring minikube cluster '$CLUSTER' to enable permanent volumes for databases"
-      minikube -p $CLUSTER cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
+  checkCommandInstalled jq yq envsubst
+  if [[ $K8S_DEPLOYMENT == 'minikube' ]]; then
+    if which minikube > /dev/null 2>&1 ; then
+      # Get the minikube IP address
+      IP=$(getMinikubeIP)
     fi
+  elif [[ $K8S_DEPLOYMENT == 'k3s' ]]; then
+    IP=$(ip route get 1.1.1.1 | grep -oP 'src \K\S+')
   else
-    echo "[WARN]Minikube not installed. Cannot configure"
+    # don't know what to do here. The remote cluster will have its own ingres IP
+    # Perhaps it is set in ~/.tyk-sandbox?
+    if [[ -z $IP ]]; then
+      if [[ -n $SBX_HOST_IP_ADDR ]]; then
+        IP=$SBX_HOST_IP_ADDR
+      else
+        IP=dunno_the_IP
+      fi
+    fi
   fi
 }
 
@@ -315,6 +337,37 @@ function startMinikube {
     fi
   else
     echo "[FATAL]Minikube profile '$CLUSTER' does not exist. Use '$SCRIPTNAME -C $CLUSTER init' to create it"
+  fi
+}
+
+function minikubeProfileExists {
+  if minikube profile list 2> /dev/null | grep -qw $CLUSTER; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# setup k3s from scratch
+function setupK3s {
+  if [[ ! -f /usr/local/bin/k3s ]]; then
+    curl -sfL https://get.k3s.io | sh -
+    if [[ ! -d $HOME/.kube ]]; then
+      mkdir ~/.kube
+    fi
+    if [[ ! -f ~/.kube/config ]]; then
+      sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+      sudo chown $(id -u):$(id -g) ~/.kube/config
+    else
+      echo "[INFO]~/.kube/config already exists not modifying it"
+    fi
+    export KUBECONFIG="$HOME/.kube/config"
+    grep -q 'KUBECONFIG=$HOME/.kube/config' ~/.bashrc || echo 'KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
+    echo "KUBECONFIG=$HOME/.kube/config has been added to ~/.bashrc please logout and in again"
+    # Build the bastion image
+    $SCRIPTDIR/tbi/k3s-image-build.sh
+  else
+    echo "[WARN]k3s is already installed in /usr/local/bin/k3s"
   fi
 }
 
@@ -341,14 +394,27 @@ function setupMinikube {
       kubectl patch deployment dashboard-metrics-scraper -p '{"spec":{"template":{"spec":{"containers":[{"name":"dashboard-metrics-scraper","args":["--metric-duration=2h","--metric-resolution=60s"]}]}}}}' -n kubernetes-dashboard
       # install cert-manager now so that its ready when needed
       kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.19.1/cert-manager.yaml --wait
-      set +x
+      # make sure that the Tyk helm repo is available
+      installTykHelmRepo
     else
       echo "[WARN]Minikube cluster '$CLUSTER' is already running. Not setting it up again"
     fi
     # check that the bastion image is available in minikube and build it if not.
-    $SCRIPTDIR/tbi/build-and-register.sh
+    $SCRIPTDIR/tbi/minikube-image-build.sh
   else
     echo "[WARN]Minikube not installed. Cannot start"
+  fi
+}
+
+# copy "$SCRIPTDIR/etc/tmp.conf" into minikube so that permanent volumes can be created
+function setupMinikubeStorage {
+  if which minikube > /dev/null 2>&1 ; then
+    if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
+      echo "[INFO]Configuring minikube cluster '$CLUSTER' to enable permanent volumes for databases"
+      minikube -p $CLUSTER cp "$SCRIPTDIR/etc/tmp.conf" /etc/tmpfiles.d/ --user root
+    fi
+  else
+    echo "[WARN]Minikube not installed. Cannot configure"
   fi
 }
 
@@ -362,11 +428,7 @@ function setupHelmAndOperator {
     operatorVersion="--version $KSBX_OPERATOR_VERSION"
   fi
   if which helm > /dev/null 2>&1; then
-    #kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.17.0/cert-manager.yaml --wait
-    #echo "[INFO]Sleeping for 30 seconds to allow the cert-manager to start, be patient"
-    #sleep 30
     kubectl create namespace tyk-operator-system
-    #TYK_OPERATOR_LICENSEKEY=$(echo $SBX_LICENSE | base64 -w 0)
     kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_OPERATOR_LICENSEKEY=$SBX_LICENSE"
     helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
     helm repo update
@@ -375,7 +437,6 @@ function setupHelmAndOperator {
       echo "[WARN]Operator install failed. Retrying, but only once"
       kubectl delete ns tyk-operator-system --wait
       kubectl create namespace tyk-operator-system
-      #kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_TLS_INSECURE_SKIP_VERIFY=true"
       kubectl create secret -n tyk-operator-system generic tyk-operator-conf --from-literal "TYK_OPERATOR_LICENSEKEY=$SBX_LICENSE"
       sleep 10
       echo "[INFO]Reattempting to deploy operator using helm. This may take a while"
@@ -419,36 +480,6 @@ function waitDeploymentReady {
       echo "[FATAL]Cannot find a deployment matching '$1'"
       exit 1
     fi
-  fi
-  echo " done"
-}
-
-# Wait for a pod to start (not used anymore)
-function waitPodReady {
-  typeset podName
-  podName=$(getPodName $1)
-  if [[ -n $podName ]]; then
-    echo -n "[INFO]Waiting for pod $NAMESPACE:$podName to be ready."
-    while [[ $( kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | awk -F '[ /]+' '{print $2}' ) -ne 1 ]]; do
-      echo -n .
-      sleep 5
-      if kubectl logs -n $NAMESPACE "$podName" 2>&1 | grep -q 'trying and failing to pull image'; then
-        echo; echo "[FATAL]Unable to pull image for '$podName'"
-        exit 1
-      fi
-      # Pending pods mean there aren't enough resources. Warn and exit
-      if kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | grep -qi 'pending'; then
-        # give it some time to find a place for the pod
-        sleep 5
-        if kubectl get pods --no-headers=true -n $NAMESPACE "$podName" | grep -qi 'pending'; then
-          echo; echo "[FATAL]Not enough resources in the cluster to run $podName"
-          exit 1
-        fi
-      fi
-    done
-  else
-    echo "[FATAL]Cannot find a pod matching '$1'"
-    exit 1
   fi
   echo " done"
 }
@@ -1218,17 +1249,21 @@ function deployCRDAPIs {
 
 # Process commands and take actions
 if [[ $# -gt 0 ]]; then
-  if ! minikubeProfileExists ; then
-    if [[ $1 != 'init' ]]; then
-      echo "[FATAL]Minikube cluster '$CLUSTER' not initialised"
-      echo "[INFO]Run: $SCRIPTNAME init"
-      minikube profile list 2>/dev/null
-      exit 1
+  if [[ $K8S_DEPLOYMENT == "minikube" ]]; then
+    if ! minikubeProfileExists ; then
+      if [[ $1 != 'init' ]]; then
+        echo "[FATAL]Minikube cluster '$CLUSTER' not initialised"
+        echo "[INFO]Run: $SCRIPTNAME init"
+        minikube profile list 2>/dev/null
+        exit 1
+      fi
     fi
   fi
   # setup global aliases and variables
   setGlobals
-  startMinikube quiet
+  if [[ $K8S_DEPLOYMENT == "minikube" ]]; then
+    startMinikube quiet
+  fi
   case $1 in
 
     create)
@@ -1581,36 +1616,6 @@ if [[ $# -gt 0 ]]; then
       fi
       ;;
 
-    rm | del*)
-      typeset API
-      typeset OC
-      shift
-      if [[ $# -lt 1 ]]; then
-        echo "[FATAL]Must provide namespace"
-        exit 1
-      fi
-      for NAMESPACE in $(getNamespaceNames $*); do
-        if namespaceExists $NAMESPACE; then
-          echo "[INFO]Deleting Namespace $NAMESPACE"
-          MaskOperatorContext $NAMESPACE
-          RemoveTykCRDs $NAMESPACE
-          if OperatorContextExists $NAMESPACE ]]; then
-            echo "[INFO]Deleting OperatorContext from $NAMESPACE"
-            echo "[INFO]kubectl delete OperatorContext --all -n $NAMESPACE"
-            kubectl delete OperatorContext --all -n $NAMESPACE
-            echo "[INFO]kubectl delete namespace $NAMESPACE --wait"
-          fi
-          kubectl delete namespace $NAMESPACE --wait
-        fi
-      done
-      tidyReleasedPVCs
-      for NAMESPACE in $(getNamespaceNames $*); do
-        # minikube doesn't always remove the PVs properly. Lets get rid of them properly
-        #echo "minikube -p $CLUSTER ssh -- \"test -d /var/hostpath-provisioner/$NAMESPACE/ && sudo rm -rf /var/hostpath-provisioner/$NAMESPACE/\""
-        minikube -p $CLUSTER ssh -- "test -d /var/hostpath-provisioner/$NAMESPACE/ && sudo rm -rf /var/hostpath-provisioner/$NAMESPACE/" 2>/dev/null
-      done
-      ;;
-
     help)
       help
       ;;
@@ -1644,8 +1649,14 @@ if [[ $# -gt 0 ]]; then
       done
       ;;
     init)
-      setupMinikube
-      setupMinikubeStorage
+      if [[ $K8S_DEPLOYMENT == "minikube" ]]; then
+        setupMinikube
+        setupMinikubeStorage
+      elif [[ $K8S_DEPLOYMENT == "k3s" ]]; then
+        setupK3s
+      else
+        echo "[WARN]Init is only valid for minikube and k3s. K8S_DEPLOYMENT=$K8S_DEPLOYMENT"
+      fi
       ;;
 
     list)
@@ -1913,6 +1924,38 @@ if [[ $# -gt 0 ]]; then
       fi
       ;;
 
+    rm | del*)
+      typeset API
+      typeset OC
+      shift
+      if [[ $# -lt 1 ]]; then
+        echo "[FATAL]Must provide namespace"
+        exit 1
+      fi
+      for NAMESPACE in $(getNamespaceNames $*); do
+        if namespaceExists $NAMESPACE; then
+          echo "[INFO]Deleting Namespace $NAMESPACE"
+          MaskOperatorContext $NAMESPACE
+          RemoveTykCRDs $NAMESPACE
+          if OperatorContextExists $NAMESPACE ]]; then
+            echo "[INFO]Deleting OperatorContext from $NAMESPACE"
+            echo "[INFO]kubectl delete OperatorContext --all -n $NAMESPACE"
+            kubectl delete OperatorContext --all -n $NAMESPACE
+            echo "[INFO]kubectl delete namespace $NAMESPACE --wait"
+          fi
+          kubectl delete namespace $NAMESPACE --wait
+        fi
+      done
+      tidyReleasedPVCs
+      if [[ $K8S_DEPLOYMENT == "minikube" ]]; then
+        for NAMESPACE in $(getNamespaceNames $*); do
+          # minikube doesn't always remove the PVs properly. Lets get rid of them properly
+          #echo "minikube -p $CLUSTER ssh -- \"test -d /var/hostpath-provisioner/$NAMESPACE/ && sudo rm -rf /var/hostpath-provisioner/$NAMESPACE/\""
+          minikube -p $CLUSTER ssh -- "test -d /var/hostpath-provisioner/$NAMESPACE/ && sudo rm -rf /var/hostpath-provisioner/$NAMESPACE/" 2>/dev/null
+        done
+      fi
+      ;;
+
     setup)
       shift
       if [[ $# -lt 1 ]]; then
@@ -1954,7 +1997,11 @@ if [[ $# -gt 0 ]]; then
       ;;
 
     start)
-      startMinikube
+      if [[ $K8S_DEPLOYMENT == "minikube" ]]; then
+        startMinikube
+      else
+        echo "[INFO]Start is only needed for minikube but K8S_DEPLOYMENT=$K8S_DEPLOYMENT"
+      fi
       ;;
 
     version*)
