@@ -69,7 +69,7 @@ spec:
       volumes:
         - name: plugins
           hostPath:
-            path: /plugins
+            path: ${KSBX_PLUGIN_PATH}
         - name: tyk-gateway-conf
           configMap:
             name: tyk-gateway-conf-standalone

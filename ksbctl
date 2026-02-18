@@ -302,13 +302,18 @@ function getMinikubeIP {
 # checks done to setup env on every run
 function setGlobals {
   checkCommandInstalled jq yq envsubst
+  export KSBX_PLUGIN_PATH
   if [[ $K8S_DEPLOYMENT == 'minikube' ]]; then
     if which minikube > /dev/null 2>&1 ; then
       # Get the minikube IP address
       IP=$(getMinikubeIP)
     fi
+    # we need to set the env var KSBX_PLUGIN_PATH so that plugin directories are mounted
+    # this is because minikube has a special way of doing this
+    KSBX_PLUGIN_PATH=/plugins
   elif [[ $K8S_DEPLOYMENT == 'k3s' ]]; then
     IP=$(ip route get 1.1.1.1 | grep -oP 'src \K\S+')
+    KSBX_PLUGIN_PATH=$HOME/.tyk/plugins
   else
     # don't know what to do here. The remote cluster will have its own ingres IP
     # Perhaps it is set in ~/.tyk-sandbox?
@@ -348,24 +353,53 @@ function minikubeProfileExists {
   fi
 }
 
+# install the tyk repo and update
+function installTykHelmRepo {
+  if ! helm repo list | grep -wq tyk-helm; then
+    helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
+  fi
+  helm repo update
+}
+
+function installCertManager {
+  kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.19.1/cert-manager.yaml --wait
+}
+
+function buildBastion {
+  if [[ $K8S_DEPLOYMENT == 'minikube' ]]; then
+    $SCRIPTDIR/tbi/minikube-image-build.sh
+  elif [[ $K8S_DEPLOYMENT == 'k3s' ]]; then
+    $SCRIPTDIR/tbi/k3s-image-build.sh
+  else
+    echo "[WARN]You'll need to make the bastion image available in your k8s cluster for this script to work"
+  fi
+}
+
 # setup k3s from scratch
 function setupK3s {
+  # make sure we have somewhere to store plugins
+  if [[ ! -d $HOME/.tyk/plugins ]]; then
+    mkdir -p $HOME/.tyk/plugins
+  fi
   if [[ ! -f /usr/local/bin/k3s ]]; then
+    KUBECONFIG=''
+    export KUBECONFIG
     curl -sfL https://get.k3s.io | sh -
     if [[ ! -d $HOME/.kube ]]; then
       mkdir ~/.kube
     fi
-    if [[ ! -f ~/.kube/config ]]; then
-      sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-      sudo chown $(id -u):$(id -g) ~/.kube/config
-    else
-      echo "[INFO]~/.kube/config already exists not modifying it"
-    fi
-    export KUBECONFIG="$HOME/.kube/config"
-    grep -q 'KUBECONFIG=$HOME/.kube/config' ~/.bashrc || echo 'KUBECONFIG=$HOME/.kube/config' >> ~/.bashrc
-    echo "KUBECONFIG=$HOME/.kube/config has been added to ~/.bashrc please logout and in again"
-    # Build the bastion image
-    $SCRIPTDIR/tbi/k3s-image-build.sh
+    sudo cp /etc/rancher/k3s/k3s.yaml $HOME/.kube/k3s-config
+    sudo chown $(id -u):$(id -g) $HOME/.kube/k3s-config
+    KUBECONFIG="$HOME/.kube/k3s-config"
+    # install cert-manager now so that its ready when needed
+    installCertManager
+    # make sure that the Tyk helm repo is available
+    installTykHelmRepo
+    # check that the bastion image is available in k3s and build it if not.
+    buildBastion
+    # we always need to update KUBECONFIG
+    echo "export KUBECONFIG=$KUBECONFIG" >> ~/.bashrc
+    echo "[INFO]'export KUBECONFIG=$KUBECONFIG' has been added to ~/.bashrc please source it or logout and in again"
   else
     echo "[WARN]k3s is already installed in /usr/local/bin/k3s"
   fi
@@ -375,6 +409,8 @@ function setupK3s {
 function setupMinikube {
   typeset mount_command
   mount_command=""
+  KUBECONFIG=$HOME/.kube/minikube-config
+  export KUBECONFIG
   if which minikube > /dev/null 2>&1 ; then
     if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
       if [[ ! -d $HOME/.tyk/plugins ]]; then
@@ -393,14 +429,17 @@ function setupMinikube {
       # patch the metrics server to keep 2 hours of metrics with 1m granularity
       kubectl patch deployment dashboard-metrics-scraper -p '{"spec":{"template":{"spec":{"containers":[{"name":"dashboard-metrics-scraper","args":["--metric-duration=2h","--metric-resolution=60s"]}]}}}}' -n kubernetes-dashboard
       # install cert-manager now so that its ready when needed
-      kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.19.1/cert-manager.yaml --wait
+      installCertManager
       # make sure that the Tyk helm repo is available
       installTykHelmRepo
+      # we always need to update KUBECONFIG
+      echo "export KUBECONFIG=$KUBECONFIG" >> ~/.bashrc
+      echo "[INFO]'export KUBECONFIG=$KUBECONFIG' has been added to ~/.bashrc please source it or logout and in again"
     else
       echo "[WARN]Minikube cluster '$CLUSTER' is already running. Not setting it up again"
     fi
     # check that the bastion image is available in minikube and build it if not.
-    $SCRIPTDIR/tbi/minikube-image-build.sh
+    buildBastion
   else
     echo "[WARN]Minikube not installed. Cannot start"
   fi
