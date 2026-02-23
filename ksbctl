@@ -388,6 +388,11 @@ function setupK3s {
     if [[ ! -d $HOME/.kube ]]; then
       mkdir ~/.kube
     fi
+    # keep lots of logs
+    yq eval '.["kubelet-arg"] = ["container-log-max-files=2", "container-log-max-size=1Gi"]' --null-input | sudo tee /etc/rancher/k3s/config.yaml
+    sudo chown root:root /etc/rancher/k3s/config.yaml
+    sudo chmod 600 /etc/rancher/k3s/config.yaml
+    sudo systemctl restart k3s
     sudo cp /etc/rancher/k3s/k3s.yaml $HOME/.kube/k3s-config
     sudo chown $(id -u):$(id -g) $HOME/.kube/k3s-config
     KUBECONFIG="$HOME/.kube/k3s-config"
