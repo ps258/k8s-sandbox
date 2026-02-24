@@ -355,6 +355,7 @@ function minikubeProfileExists {
 
 # install the tyk repo and update
 function installTykHelmRepo {
+  echo "[INFO]Configuring the necessary helm repos"
   if ! helm repo list | grep -wq tyk-helm; then
     helm repo add tyk-helm https://helm.tyk.io/public/helm/charts/
   fi
@@ -362,10 +363,12 @@ function installTykHelmRepo {
 }
 
 function installCertManager {
+  echo "[INFO]Installing certificate manager"
   kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.19.1/cert-manager.yaml --wait
 }
 
 function buildBastion {
+  echo "[INFO]Making the bastion image available in k8s"
   if [[ $K8S_DEPLOYMENT == 'minikube' ]]; then
     $SCRIPTDIR/tbi/minikube-image-build.sh
   elif [[ $K8S_DEPLOYMENT == 'k3s' ]]; then
@@ -375,7 +378,7 @@ function buildBastion {
   fi
 }
 
-# setup k3s from scratch
+# setup k3s and get it ready to deploy sandboxes
 function setupK3s {
   # make sure we have somewhere to store plugins
   if [[ ! -d $HOME/.tyk/plugins ]]; then
@@ -384,7 +387,8 @@ function setupK3s {
   if [[ ! -f /usr/local/bin/k3s ]]; then
     KUBECONFIG=''
     export KUBECONFIG
-    curl -sfL https://get.k3s.io | sh -
+    echo "[INFO]Installing and configuring k3s"
+    curl -sfL https://get.k3s.io | sh -s - --disable traefik
     if [[ ! -d $HOME/.kube ]]; then
       mkdir ~/.kube
     fi
@@ -393,6 +397,7 @@ function setupK3s {
     sudo chown root:root /etc/rancher/k3s/config.yaml
     sudo chmod 600 /etc/rancher/k3s/config.yaml
     sudo systemctl restart k3s
+    echo "[INFO]Setting up your KUBECONFIG variable"
     sudo cp /etc/rancher/k3s/k3s.yaml $HOME/.kube/k3s-config
     sudo chown $(id -u):$(id -g) $HOME/.kube/k3s-config
     KUBECONFIG="$HOME/.kube/k3s-config"
@@ -410,7 +415,7 @@ function setupK3s {
   fi
 }
 
-# start minikube if it's not already running
+# Setup minikube and get it ready to deploy sandboxes
 function setupMinikube {
   typeset mount_command
   mount_command=""
@@ -432,6 +437,7 @@ function setupMinikube {
       # give it a few seconds to settle down
       sleep 5
       # patch the metrics server to keep 2 hours of metrics with 1m granularity
+      echo "[INFO]Setting up the metrics server to capture 2h metrics with a 60s resolution"
       kubectl patch deployment dashboard-metrics-scraper -p '{"spec":{"template":{"spec":{"containers":[{"name":"dashboard-metrics-scraper","args":["--metric-duration=2h","--metric-resolution=60s"]}]}}}}' -n kubernetes-dashboard
       # install cert-manager now so that its ready when needed
       installCertManager
