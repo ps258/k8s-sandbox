@@ -43,11 +43,19 @@ for NAMESPACE in $*; do
 		kubectl get ApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers)' | kubectl apply -f -
 	done
 	sleep 1
+	# delete OAS API definitions
+	echo "[INFO]Deleting TykOasApiDefinition from $NAMESPACE"
+	for API in $(kubectl get TykOasApiDefinition -n $NAMESPACE --no-headers=true 2>&- | awk '{print $1}'); do
+		kubectl get TykOasApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers[])' | kubectl apply -f -
+		kubectl get TykOasApiDefinition $API -n $NAMESPACE -o yaml | yq 'del(.metadata.finalizers)' | kubectl apply -f -
+	done
+	sleep 1
 
 	kubectl delete portalapicatalogues --all -n $NAMESPACE
 	kubectl delete apidescription --all -n $NAMESPACE
 	kubectl delete securitypolicies --all -n $NAMESPACE
 	kubectl delete ApiDefinition --all -n $NAMESPACE
+	kubectl delete TykOasApiDefinition --all -n $NAMESPACE
 
 	# delete OperatorContext finalizer since it can hang too
 	for OC in $(kubectl get OperatorContext -n $NAMESPACE --no-headers=true 2>&- | awk '{print $1}'); do
@@ -58,7 +66,7 @@ for NAMESPACE in $*; do
 	kubectl delete OperatorContext --all -n $NAMESPACE
 
 	# now check results
-  for CRD in portalapicatalogues apidescription securitypolicies ApiDefinition; do
+  for CRD in portalapicatalogues apidescription securitypolicies ApiDefinition TykOasApiDefinition; do
 	  echo "[INFO]Checking $CRD from $NAMESPACE to see if the finalizer is gone"
 	  for item in $(kubectl get $CRD -n $NAMESPACE --no-headers=true | awk '{print $1}'); do
 		  echo $item $(kubectl get $CRD $item -n $NAMESPACE -o yaml | yq .metadata.finalizers)
