@@ -818,7 +818,7 @@ function CrdExists {
   namespace=$1
   CRD=$2
   CrdCount=0
-  if kubectl get crd -n $namespace --no-headers=true 2>&- | grep -q "$CRD"; then
+  if kubectl get crd -n $namespace --no-headers=true 2>&- | grep -iq "$CRD"; then
     if [[ $(kubectl get $CRD -n $namespace --no-headers=true 2>&- | wc -l) -gt 0 ]]
     then
       return 0
@@ -839,7 +839,7 @@ function RemoveTykCRDs {
   typeset namespace
   typeset CRD
   namespace=$1
-  for CRD in portalapicatalogues apidescriptions securitypolicies apidefinitions supergraphs subgraphs portalconfigs; do
+  for CRD in portalapicatalogues apidescription securitypolicies subgraphs supergraphs apidefinitions tykoasapidefinitions tykstreamsapidefinitions portalconfigs; do
     if CrdExists $namespace $CRD; then
       echo "[INFO]Removing all $CRD from $namespace"
       kubectl delete $CRD --all -n $namespace
