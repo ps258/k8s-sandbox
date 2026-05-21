@@ -22,7 +22,7 @@ ENVFILE=$HOME/.tyk-sandbox
 # define defaults in $HOME/.tyk-sandbox
 # K8S_DEPLOYMENT is the underlying k8s deployment to use
 # default to minikube for now
-K8S_DEPLOYMENT=k3s
+K8S_DEPLOYMENT=minikube
 # if the standard setup file exists take defaults from that
 if [[ -f $ENVFILE ]]; then
   . $ENVFILE
@@ -284,14 +284,6 @@ function checkMongoShellInstalled {
     else
       MONGOSHELL=mongo
     fi
-  fi
-}
-
-function minikubeProfileExists {
-  if minikube profile list 2> /dev/null | grep -qw $CLUSTER; then
-    return 0
-  else
-    return 1
   fi
 }
 
