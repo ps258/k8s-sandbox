@@ -338,7 +338,7 @@ function startMinikube {
 }
 
 function minikubeProfileExists {
-  if minikube profile list 2> /dev/null | grep -qw $CLUSTER; then
+  if minikube profile list -o json 2> /dev/null | jq -r '.valid[].Name' | grep -qw $CLUSTER; then
     return 0
   else
     return 1
@@ -413,6 +413,8 @@ function setupMinikube {
   mount_command=""
   KUBECONFIG=$HOME/.kube/minikube-config
   export KUBECONFIG
+  MINIKUBE_IN_STYLE=false
+  export MINIKUBE_IN_STYLE
   if which minikube > /dev/null 2>&1 ; then
     if ! minikube -p $CLUSTER status > /dev/null 2>&1 ; then
       if [[ ! -d $HOME/.tyk/plugins ]]; then
