@@ -50,7 +50,7 @@ if [[ ! -d code ]]; then
     sudo install yq_linux_arm64 /usr/local/bin/yq && rm yq_linux_arm64
     # minikube
     curl -LO https://github.com/kubernetes/minikube/releases/latest/download/minikube-linux-arm64
-    sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-arm64
+    sudo install minikube-linux-arm64 /usr/local/bin/minikube && rm minikube-linux-arm64
   fi
 
   # install docker
@@ -74,7 +74,7 @@ if [[ ! -d code ]]; then
 
   helm repo update
 
-  mkdir bin
+  mkdir ~/bin
   echo 'PATH=$PATH:$HOME/bin:$HOME/code/tyk-sandbox:$HOME/code/k8s-sandbox:$HOME/code/helm-sandbox:$HOME/code/tyk-sandbox/scripts:$HOME/code/tyk-scripts/python' >> ~/.bashrc
   echo 'alias kubectl="minikube kubectl -- "' >> ~/.bashrc
   echo 'alias k=kubectl' >> ~/.bashrc
