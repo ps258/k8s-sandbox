@@ -1700,9 +1700,12 @@ if [[ $# -gt 0 ]]; then
         setupK3s
       else
         echo "[WARN]Init is only valid for minikube and k3s. K8S_DEPLOYMENT=$K8S_DEPLOYMENT"
+        exit 1
       fi
+      echo "********************************************************************************"
+      echo "[WARN]********** KUBECONFIG MIGHT HAVE CHANGED, SOURCE YOUR ~/.bashrc **********"
+      echo "********************************************************************************"
       ;;
-
     list)
       echo "[INFO]kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL"
       kubectl get namespaces --selector=$NAMESPACE_SELECTOR_LABEL
