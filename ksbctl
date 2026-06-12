@@ -73,7 +73,7 @@ NAMESPACE_SELECTOR_LABEL="creator=ksbctl"
 NAMESPACE=''
 EXTRA_NAMESPACE_LABELS=''
 ISTIO_INJECTION_LABEL='istio-injection=enabled'
-POD_MONITOR_FREQ=5
+POD_MONITOR_FREQ=5s
 KSBX_DESCRIPTION='N/A'
 KSBX_DATABASE=mongo
 KSBX_TYPE=pro
@@ -164,7 +164,7 @@ function help {
   echo "      -v rollout the named version into the pods. No checking of the version is done"
   echo "         so make sure it's right"
   echo "$name monitor <sandbox namespace> <pod name>"
-  echo "      Print CPU and memory usage for the containers in the pod every $POD_MONITOR_FREQ seconds"
+  echo "      Print CPU and memory usage for the containers in the pod every $POD_MONITOR_FREQ"
   echo "$name operatorlogs"
   echo "      Tail the logs of the tyk operator pod"
   echo "$name pods <sandbox namespace...>"
@@ -431,8 +431,8 @@ function setupMinikube {
       # give it a few seconds to settle down
       sleep 5
       # patch the metrics server to keep 2 hours of metrics with 1m granularity
-      echo "[INFO]Setting up the metrics server to capture 2h metrics with a 60s resolution"
-      kubectl patch deployment dashboard-metrics-scraper -p '{"spec":{"template":{"spec":{"containers":[{"name":"dashboard-metrics-scraper","args":["--metric-duration=2h","--metric-resolution=60s"]}]}}}}' -n kubernetes-dashboard
+      echo "[INFO]Setting up the metrics server to capture 2h metrics with a $POD_MONITOR_FREQ resolution"
+      kubectl patch deployment dashboard-metrics-scraper -p '{"spec":{"template":{"spec":{"containers":[{"name":"dashboard-metrics-scraper","args":["--metric-duration=2h","--metric-resolution='$POD_MONITOR_FREQ'"]}]}}}}' -n kubernetes-dashboard
       # install cert-manager now so that its ready when needed
       installCertManager
       # make sure that the Tyk helm repo is available
@@ -1912,7 +1912,7 @@ if [[ $# -gt 0 ]]; then
         exit 1
       fi
       monitorPodName=$(getPodNames "$2" | head -1)
-      echo "[INFO]Monitoring $monitorPodName CPU and Memory every $POD_MONITOR_FREQ s"
+      echo "[INFO]Monitoring $monitorPodName CPU and Memory every $POD_MONITOR_FREQ"
       echo "[INFO]kubectl top pod $monitorPodName -n $NAMESPACE --containers --no-headers=true"
       while true; do
         date +%F_%T
