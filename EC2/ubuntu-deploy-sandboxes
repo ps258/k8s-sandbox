@@ -11,10 +11,14 @@ if [[ ! -d code ]]; then
   cd code
   ssh-keyscan github.com >> ~/.ssh/known_hosts
   chmod 600 ~/.ssh/known_hosts
-  git clone git@github.com:ps258/tyk-sandbox.git
-  git clone git@github.com:ps258/tyk-scripts.git
-  git clone git@github.com:ps258/k8s-sandbox.git
-  git clone git@github.com:ps258/helm-sandbox.git
+  #git clone git@github.com:ps258/tyk-sandbox.git
+  #git clone git@github.com:ps258/tyk-scripts.git
+  #git clone git@github.com:ps258/k8s-sandbox.git
+  #git clone git@github.com:ps258/helm-sandbox.git
+  git clone https://github.com/ps258/tyk-sandbox.git
+  git clone https://github.com/ps258/tyk-scripts.git
+  git clone https://github.com/ps258/k8s-sandbox.git
+  git clone https://github.com/ps258/helm-sandbox.git
   cd ~
 
   # install packages
