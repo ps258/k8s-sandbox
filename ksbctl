@@ -1913,7 +1913,7 @@ if [[ $# -gt 0 ]]; then
         echo "[FATAL]Must provide namespace and podname"
         exit 1
       fi
-      monitorPodName=$(getPodNames "$2" | head -1)
+      monitorPodName=$(getPodNames "$2" | awk '{print $1}')
       echo "[INFO]Monitoring $monitorPodName CPU and Memory every $POD_MONITOR_FREQ"
       echo "[INFO]kubectl top pod $monitorPodName -n $NAMESPACE --containers --no-headers=true"
       while true; do
