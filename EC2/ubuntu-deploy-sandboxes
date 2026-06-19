@@ -30,13 +30,14 @@ if [[ ! -d code ]]; then
   sudo apt-get install -y jq
   sudo apt-get install -y ksh
 
-  # redis and mongo client tools
+  # redis, mongo and postgres client tools
   sudo apt-get install -y redis-tools
   wget -qO- https://www.mongodb.org/static/pgp/server-8.0.asc | sudo tee /etc/apt/trusted.gpg.d/server-8.0.asc
   sudo apt-get install -y gnupg
   echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
   sudo apt-get -y update
   sudo apt-get install -y mongodb-mongosh
+  sudo apt install postgresql-client-common postgresql-client
 
   # install yq and minikube
   if [[ $(uname -m) == 'x86_64' ]]; then
@@ -92,6 +93,6 @@ else
   # already done most of the setup
   # for tyk-sandbox we need a local httpbin. This works on ARM64 and AMD64
   docker run -d --restart unless-stopped -p 80:8080 mccutchen/go-httpbin
-  # setup minikube env
+  # setup kubernetes env
   ksbctl init
 fi
