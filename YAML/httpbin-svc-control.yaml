@@ -1,7 +1,7 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: httpbin
+  name: org
   labels:
     app: httpbin
     plane: control

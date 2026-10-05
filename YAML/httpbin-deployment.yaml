@@ -24,6 +24,8 @@ spec:
         plane: control
       annotations:
     spec:
+      hostname: httpbin
+      subdomain: org
       containers:
       - image: kennethreitz/httpbin:latest
         imagePullPolicy: IfNotPresent
