@@ -4,6 +4,7 @@
 
 PATH=/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:$PATH
 CDPATH=
+unalias rm
 
 # Dependencies
 #  ksh to support arrays. the Mac version of bash doesn't
@@ -753,7 +754,7 @@ function reportSanboxInfo {
 # these labels are used internally and are also helpful for remembering why you created the sandbox
 function createNamespace {
   typeset configYAML
-  configYAML=$(mktemp /tmp/configYAML.yaml.XXXX)
+  configYAML=$(mktemp /tmp/configYAML.yaml.XXXXX)
   if ! namespaceExists $NAMESPACE; then
     echo "[INFO]kubectl create ns $NAMESPACE"
     kubectl create ns $NAMESPACE
@@ -865,7 +866,7 @@ function applyYAMLtemplate {
   typeset tmpYamlFile
   for YAMLfile in $*; do
     YAMLfile=$(basename $YAMLfile)
-    tmpYamlFile=$(mktemp /tmp/XXXXX-$YAMLfile)
+    tmpYamlFile=$(mktemp /tmp/${YAMLfile}-XXXXX)
     if [[ -f $YAMLDIR/$YAMLfile ]]; then
       cat $YAMLDIR/$YAMLfile | envsubst > $tmpYamlFile
       if [[ -n $ENV_VAR_FILE ]]; then
@@ -1088,10 +1089,10 @@ function enableEdgeHttps {
   # generate the edge gateway certificate
   SAN="DNS:localhost, DNS:*.$NAMESPACE.svc.cluster.local"
   SUBJECT="/emailAddress=$NAMESPACE@company.com/C=GB/ST=K8s Sandbox/L=$(date +"%Y-%b-%d %T %Z")/O=Support/OU=Team/CN=$NAMESPACE"
-  GW_KEY_FILE=$(mktemp /tmp/XXXXX-gateway-key.pem)
-  GW_CRT_FILE=$(mktemp /tmp/XXXXX-gateway-certificate.pem)
-  GW_CSR_FILE=$(mktemp /tmp/XXXXX-certificate.csr)
-  GW_EXT_FILE=$(mktemp /tmp/XXXXX-extfile.ext)
+  GW_KEY_FILE=$(mktemp /tmp/gateway-key.pem-XXXXX)
+  GW_CRT_FILE=$(mktemp /tmp/gateway-certificate.pem-XXXXX)
+  GW_CSR_FILE=$(mktemp /tmp/certificate.csr-XXXXX)
+  GW_EXT_FILE=$(mktemp /tmp/extfile.ext-XXXXX)
   openssl genrsa -des3 -passout pass:ABC-123 -out $GW_KEY_FILE 2048
   openssl req -new -key $GW_KEY_FILE -passin pass:ABC-123 -subj "$SUBJECT" -out $GW_CSR_FILE
   cp $GW_KEY_FILE ${GW_KEY_FILE}.orig
@@ -1175,10 +1176,10 @@ function publishAPIs {
             curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfile"
           else
             # deal with the files that are exported APIs from the dashboard
-            APIfileName=$(mktemp "/tmp/$(basename '$APIfile').XXXXXX")
+            APIfileName=$(mktemp "/tmp/$(basename '$APIfile').XXXXX")
             createApiDefintion "$APIfile" > $APIfileName
             curl -s -X POST -H "Content-Type: application/json" -H "Authorization: $adminKey" http://$IP:$DashboardPort/api/apis -d @"$APIfileName"
-            \rm $APIfileName
+            rm $APIfileName
           fi
         else
           # We're probably dealing with a YAML file since the first character in the file is NOT a '{'
@@ -1231,7 +1232,7 @@ function deployOperatorContext {
   typeset adminKey
   typeset orgid
   typeset OperatorContextYAML
-  OperatorContextYAML=$(mktemp /tmp/operatorContext.yaml.XXXX)
+  OperatorContextYAML=$(mktemp /tmp/operatorContext.yaml.XXXXX)
   if [[ $KSBX_TYPE == 'pro' || $KSBX_TYPE == 'mdcb' ]]; then
     # Dashboard (pro) install
     typeset dashURL
@@ -1252,7 +1253,6 @@ function deployOperatorContext {
     echo "    insecureSkipVerify: true" >> $OperatorContextYAML
     echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
     kubectl apply -f $OperatorContextYAML -n $NAMESPACE
-    rm -f $OperatorContextYAML
   else
     # stand alone (CE) deployment
     typeset gatewaySecret
@@ -1273,15 +1273,15 @@ function deployOperatorContext {
     echo "    insecureSkipVerify: true" >> $OperatorContextYAML
     echo "[INFO]kubectl apply -f $OperatorContextYAML -n $NAMESPACE"
     kubectl apply -f $OperatorContextYAML -n $NAMESPACE
-    rm -f $OperatorContextYAML
   fi
+  rm -f $OperatorContextYAML
 }
 
 # deploy APIs from YAML using operator context
 function deployCRDAPIs {
   typeset APIsourceYaml
   typeset tmpAPIyaml
-  tmpAPIyaml=$(mktemp /tmp/API.yaml.XXXX)
+  tmpAPIyaml=$(mktemp /tmp/API.yaml.XXXXX)
   for APIsourceYaml in $*; do
     if [[ -f $APIsourceYaml ]]; then
       cp $APIsourceYaml $tmpAPIyaml
@@ -1882,7 +1882,7 @@ if [[ $# -gt 0 ]]; then
         if [[ -n $newPodCount || -n $newPodVersion ]]; then
           # grab the deployment and update it
           typeset tmpDeploymentYaml
-          tmpDeploymentYaml=$(mktemp /tmp/deployment.XXXX.yaml)
+          tmpDeploymentYaml=$(mktemp /tmp/deployment.yaml-XXXXX)
           echo "[INFO]kubectl get deploy -n $NAMESPACE $deploymentName -o yaml > $tmpDeploymentYaml"
           kubectl get deploy -n $NAMESPACE $deploymentName -o yaml > $tmpDeploymentYaml
           if [[ -n $newPodCount ]]; then
