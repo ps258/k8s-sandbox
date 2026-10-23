@@ -1891,7 +1891,8 @@ if [[ $# -gt 0 ]]; then
           if [[ -n $newPodVersion ]]; then
             typeset currentVersion
             currentVersion=$(yq '.spec.template.spec.containers.[0].image' $tmpDeploymentYaml | cut -d: -f2)
-            sed -i "s/$currentVersion/$newPodVersion/" $tmpDeploymentYaml
+            # work around for macos sed not supporting "-i" without an extension
+            sed "s/$currentVersion/$newPodVersion/" $tmpDeploymentYaml > ${tmpDeploymentYaml}.bak && mv ${tmpDeploymentYaml}.bak $tmpDeploymentYaml
           fi
           echo "[INFO]kubectl apply -f $tmpDeploymentYaml -n $NAMESPACE"
           kubectl apply -f $tmpDeploymentYaml -n $NAMESPACE
